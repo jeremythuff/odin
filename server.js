@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -51,6 +53,7 @@ const server = http.createServer((req, res) => {
 });
 
 const port = process.env.PORT || 8000;
-server.listen(port, '127.0.0.1', () => {
-    console.log(`Serving / at http://127.0.0.1:${port}`);
+const host = process.env.HOST || '0.0.0.0';
+server.listen(port, host, () => {
+    console.log(`Serving / at http://${host}:${port}`);
 });

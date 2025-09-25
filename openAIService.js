@@ -2,7 +2,7 @@ const https = require('https');
 
 const OPENAI_API_HOSTNAME = 'api.openai.com';
 const OPENAI_CHAT_COMPLETIONS_PATH = '/v1/chat/completions';
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const MAX_CANDIDATES = 10;
 
 const normalizeIsbn = (text) => {
@@ -141,13 +141,38 @@ const sanitizeCandidate = (candidate) => {
     return Object.keys(sanitized).length ? sanitized : null;
 };
 
+const extractJsonPayload = (rawResponse) => {
+    if (!rawResponse) {
+        return null;
+    }
+
+    const trimmed = rawResponse.trim();
+
+    const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fencedMatch) {
+        return fencedMatch[1].trim();
+    }
+
+    const arrayMatch = trimmed.match(/\[([\s\S]*)\]/);
+    if (arrayMatch) {
+        return arrayMatch[0];
+    }
+
+    return trimmed;
+};
+
 const parseCandidates = (rawResponse) => {
     if (!rawResponse) {
         return [];
     }
 
+    const payload = extractJsonPayload(rawResponse);
+    if (!payload) {
+        return [];
+    }
+
     try {
-        const parsed = JSON.parse(rawResponse);
+        const parsed = JSON.parse(payload);
         if (!Array.isArray(parsed)) {
             return [];
         }
@@ -172,7 +197,7 @@ const requestChatCompletion = (messages) => {
     const payload = JSON.stringify({
         model: DEFAULT_OPENAI_MODEL,
         messages,
-        temperature: 0.2,
+        temperature: 1.0,
     });
 
     return new Promise((resolve, reject) => {
