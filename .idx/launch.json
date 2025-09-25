@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Web app",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm start",
+      "serverReadyAction": {
+        "action": "openInPreview",
+        "pattern": "Serving \\/ at http:\\/\\/127.0.0.1:(\\d{4})"
+      }
+    }
+  ]
+}

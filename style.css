@@ -1,0 +1,43 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: #f0f0f0;
+}
+
+header {
+    background-color: #333;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+main {
+    padding: 1rem;
+}
+
+.search-container {
+    display: flex;
+    margin-bottom: 1rem;
+}
+
+#search-box {
+    flex-grow: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#search-button {
+    background-color: #333;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#results-container {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 4px;
+}
