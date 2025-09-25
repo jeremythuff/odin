@@ -80,7 +80,7 @@ const convertDescriptionToIsbn = async (description) => {
         {
             role: 'system',
             content:
-                'You are an expert librarian that identifies the most likely ISBN for a book based on short excerpts or plot descriptions. Respond with the ISBN-13 when possible.',
+                `You are a bibliographic identifier. Given a short passage or description, return the most likely source works. Prefer canonical titles; include author, earliest publication year, language, and any standard identifiers you know (ISBN-10/13, OCLC, LCCN). Return a JSON array of candidates with confidence 0–1 and concise evidence (why).`,
         },
         {
             role: 'user',
