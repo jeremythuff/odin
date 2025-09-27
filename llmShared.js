@@ -14,36 +14,15 @@ const sanitizeModelId = (value) => {
 };
 
 const resolveProvider = () => {
-    const aliases = [
-        process.env.LLM_PROVIDER,
-        process.env.AI_PROVIDER,
-        process.env.LLM_SERVICE,
-        process.env.AI_SERVICE,
-    ];
+    const rawProvider = process.env.LLM_PROVIDER;
+    const normalized = typeof rawProvider === 'string' ? rawProvider.trim().toLowerCase() : '';
 
-    for (const alias of aliases) {
-        if (typeof alias !== 'string') {
-            continue;
-        }
-
-        const normalized = alias.trim().toLowerCase();
-        if (!normalized) {
-            continue;
-        }
-
-        if (['claude', 'anthropic', 'claude-3'].includes(normalized)) {
-            return 'claude';
-        }
-
-        if (['openai', 'gpt', 'chatgpt'].includes(normalized)) {
-            return 'openai';
-        }
+    if (['claude', 'anthropic', 'claude-3'].includes(normalized)) {
+        return 'claude';
     }
 
-    if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY) {
-        if (!process.env.OPENAI_API_KEY) {
-            return 'claude';
-        }
+    if (['openai', 'gpt', 'chatgpt'].includes(normalized)) {
+        return 'openai';
     }
 
     return 'openai';

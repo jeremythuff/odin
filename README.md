@@ -9,6 +9,7 @@ Set the following environment variables before starting the server so that the a
 
 - `OPENAI_API_KEY`: A valid OpenAI API key.
 - `OPENAI_MODEL` (optional): The chat completion model to use. Defaults to `gpt-3.5-turbo` if not provided.
+- `LLM_PROVIDER`: Controls which backend is used. Set to `openai`/`chatgpt`/`gpt` to call OpenAI or `claude`/`anthropic` to call Claude. If omitted or unrecognised, OpenAI is used by default.
 
 These values are read by the backend service when processing search requests that convert descriptions or excerpts into ISBNs.
 
