@@ -230,6 +230,19 @@ main {
     width: 90%;
 }
 
+.captcha-container {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+}
+
+.captcha-error {
+    margin-top: 0.75rem;
+    color: #b00020;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
 #results-container {
     background-color: white;
     padding: 1rem;

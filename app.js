@@ -7,6 +7,7 @@ const configCatalogInput = document.getElementById('config-catalog-domain');
 const configStatus = document.getElementById('config-status');
 const configDebugInput = document.getElementById('config-debug');
 const configResetButton = document.getElementById('config-reset');
+const captchaContainer = document.getElementById('captcha-container');
 
 const escapeHtml = (value = '') => value.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char));
 
@@ -35,6 +36,19 @@ const DEFAULT_DEBUG_MODE = false;
 let debugMode = DEFAULT_DEBUG_MODE;
 let serverDebugMode = DEFAULT_DEBUG_MODE;
 let lastCatalogResultsUrl = null;
+
+const DEFAULT_CAPTCHA_CONFIG = { enabled: false, provider: null, siteKey: null };
+let captchaConfigState = { ...DEFAULT_CAPTCHA_CONFIG };
+let captchaToken = null;
+let captchaApi = null;
+let captchaWidgetId = null;
+let captchaReady = false;
+let captchaLoadPromise = null;
+let captchaError = null;
+
+if (captchaContainer) {
+    captchaContainer.hidden = true;
+}
 
 const CONFIG_STORAGE_KEY = 'odin:clientConfig';
 
@@ -94,6 +108,130 @@ const applyDebugMode = (value, options = {}) => {
     const { fallback = DEFAULT_DEBUG_MODE } = options;
     const normalized = normalizeBoolean(value, fallback);
     return setDebugMode(normalized);
+};
+
+const loadCaptchaScript = () => {
+    if (typeof window === 'undefined') {
+        return Promise.reject(new Error('Captcha is unavailable in this environment.'));
+    }
+
+    if (window.hcaptcha) {
+        return Promise.resolve(window.hcaptcha);
+    }
+
+    if (captchaLoadPromise) {
+        return captchaLoadPromise;
+    }
+
+    captchaLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://js.hcaptcha.com/1/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            if (window.hcaptcha) {
+                resolve(window.hcaptcha);
+            } else {
+                reject(new Error('Captcha API failed to load.'));
+            }
+        };
+        script.onerror = () => reject(new Error('Unable to load the captcha script.'));
+        document.head.appendChild(script);
+    });
+
+    return captchaLoadPromise;
+};
+
+const disableCaptcha = () => {
+    if (captchaApi && typeof captchaApi.remove === 'function' && captchaWidgetId !== null) {
+        try {
+            captchaApi.remove(captchaWidgetId);
+        } catch (error) {
+            console.warn('Unable to remove captcha widget:', error);
+        }
+    }
+
+    captchaConfigState = { ...DEFAULT_CAPTCHA_CONFIG };
+    captchaToken = null;
+    captchaApi = null;
+    captchaWidgetId = null;
+    captchaReady = false;
+    captchaLoadPromise = null;
+    captchaError = null;
+
+    if (captchaContainer) {
+        captchaContainer.hidden = true;
+        captchaContainer.innerHTML = '';
+    }
+};
+
+const renderCaptchaWidget = async (config) => {
+    if (!captchaContainer) {
+        console.warn('Captcha container element not found.');
+        return;
+    }
+
+    captchaContainer.hidden = false;
+    captchaContainer.innerHTML = '';
+
+    try {
+        const api = await loadCaptchaScript(config.siteKey);
+        captchaApi = api;
+        captchaWidgetId = api.render(captchaContainer, {
+            sitekey: config.siteKey,
+            callback: (token) => {
+                captchaToken = token;
+            },
+            'expired-callback': () => {
+                captchaToken = null;
+            },
+            'error-callback': () => {
+                captchaToken = null;
+            },
+        });
+        captchaReady = true;
+        captchaError = null;
+    } catch (error) {
+        captchaReady = false;
+        captchaError = 'Captcha unavailable. Please refresh the page.';
+        captchaContainer.innerHTML = `<p class="captcha-error">${escapeHtml(captchaError)}</p>`;
+        console.error('Unable to initialize captcha widget:', error);
+    }
+};
+
+const applyCaptchaConfig = async (config) => {
+    const enabled = Boolean(config && config.enabled && config.siteKey);
+    const provider = (config && typeof config.provider === 'string'
+        ? config.provider.trim().toLowerCase()
+        : '');
+
+    if (!enabled || provider !== 'hcaptcha') {
+        if (enabled && provider && provider !== 'hcaptcha') {
+            console.warn(`Unsupported captcha provider: ${provider}`);
+        }
+        disableCaptcha();
+        return;
+    }
+
+    if (captchaConfigState.enabled && captchaConfigState.siteKey === config.siteKey) {
+        return;
+    }
+
+    disableCaptcha();
+    captchaConfigState = { enabled: true, provider: 'hcaptcha', siteKey: config.siteKey };
+    await renderCaptchaWidget(captchaConfigState);
+};
+
+const resetCaptcha = () => {
+    if (!captchaConfigState.enabled) {
+        return;
+    }
+
+    if (captchaApi && typeof captchaApi.reset === 'function' && captchaWidgetId !== null) {
+        captchaApi.reset(captchaWidgetId);
+    }
+
+    captchaToken = null;
 };
 
 const buildCatalogResultsUrl = (candidates = []) => {
@@ -637,7 +775,6 @@ function toggleConfigMenu() {
 
 const performSearch = async () => {
     const query = searchBox.value.trim();
-    searchBox.value = '';
     lastRenderedPayload = null;
     lastCatalogResultsUrl = null;
 
@@ -649,6 +786,28 @@ const performSearch = async () => {
         return;
     }
 
+    if (captchaConfigState.enabled) {
+        if (captchaError) {
+            showResultsContainer();
+            resultsContainer.innerHTML = `<p class="error">${escapeHtml(captchaError)}</p>`;
+            return;
+        }
+
+        if (!captchaReady) {
+            showResultsContainer();
+            resultsContainer.innerHTML = '<p class="error">Captcha is still loading. Please try again in a moment.</p>';
+            return;
+        }
+
+        if (!captchaToken) {
+            showResultsContainer();
+            resultsContainer.innerHTML = '<p class="error">Please complete the captcha challenge before searching.</p>';
+            return;
+        }
+    }
+
+    searchBox.value = '';
+
     showResultsContainer();
     resultsContainer.innerHTML = `
         <div class="result-loading" role="status" aria-live="polite">
@@ -659,13 +818,19 @@ const performSearch = async () => {
     lastRenderedPayload = null;
     lastCatalogResultsUrl = null;
 
+    const payloadBody = { query };
+    const captchaTokenToSend = captchaConfigState.enabled ? captchaToken : '';
+    if (captchaConfigState.enabled && captchaTokenToSend) {
+        payloadBody.captchaToken = captchaTokenToSend;
+    }
+
     try {
         const response = await fetch('/api/search', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query }),
+            body: JSON.stringify(payloadBody),
         });
 
         const isJsonResponse = response.headers.get('content-type')?.includes('application/json');
@@ -706,6 +871,10 @@ const performSearch = async () => {
         console.error('There was a problem with the fetch operation:', error);
         lastRenderedPayload = null;
         lastCatalogResultsUrl = null;
+    } finally {
+        if (captchaConfigState.enabled) {
+            resetCaptcha();
+        }
     }
 };
 
@@ -728,10 +897,15 @@ const initializeConfig = async () => {
                 if (payload.debug !== undefined) {
                     fetchedDebugMode = normalizeBoolean(payload.debug, DEFAULT_DEBUG_MODE);
                 }
+
+                await applyCaptchaConfig(payload.captcha);
             }
+        } else {
+            await applyCaptchaConfig(null);
         }
     } catch (error) {
         console.error('Unable to load configuration:', error);
+        await applyCaptchaConfig(null);
     }
 
     const appliedDomain = applyCatalogDomain(fetchedCatalogDomain, { refresh: false });
