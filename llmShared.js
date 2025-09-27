@@ -239,13 +239,43 @@ const parseCandidates = (rawResponse) => {
 };
 
 const buildPrompt = (description) => ({
-    system: `You are a bibliographic identifier. Given a short passage or description, return the most likely source works.
-Prefer canonical titles; include author, earliest publication year, language, and any standard identifiers you know (ISBN-10/13,
-OCLC, LCCN). Respond with a JSON array of up to ${MAX_CANDIDATES} candidate objects ordered from highest to lowest confidence.
-Each candidate must include: title, authors (array), earliest publication year, language (if known), a confidence value between 0 and 1, concise evidence (why the work matches), and an identifiers object containing any known identifiers. If no plausible work is found, respond with an empty JSON array.`,
-    user: `List up to ${MAX_CANDIDATES} candidate works that match the description below following the required JSON schema.
-Responeses should only contain json. If nothing is plausible, return an empty JSON array.\n\nDescription: ${description}`,
+    system: [
+        'You are an expert bibliographic identifier.',
+        `Given a short passage or description, identify up to ${MAX_CANDIDATES} plausible source works.`,
+        'Return canonical titles ordered from highest to lowest confidence, include authors as an array of names, the earliest',
+        'publication year, the language when known, a confidence score between 0 and 1, concise evidence explaining the match,',
+        'and an identifiers object containing any known ISBN-13, ISBN-10, OCLC, or LCCN values.',
+        'Before finalizing a candidate, double-check that every identifier unquestionably corresponds to the same work and edition;',
+        'omit any identifier that cannot be verified. If no plausible work exists, respond with an empty JSON array.',
+        'Output must consist solely of JSON.'
+    ].join(' '),
+    user: [
+        `List up to ${MAX_CANDIDATES} candidate works that match the description below using the required JSON schema.`,
+        'Return only valid JSON and no additional commentary.',
+        'Explicitly confirm that each provided identifier belongs to the same work before including it; leave identifier fields out when uncertain.',
+        '',
+        'Expected JSON schema (array of objects):',
+        '[',
+        '  {',
+        '    "title": "string",',
+        '    "authors": ["string", "..."],',
+        '    "year": number,',
+        '    "language": "string",',
+        '    "confidence": number,',
+        '    "evidence": "string",',
+        '    "identifiers": {',
+        '      "isbn13": "string",',
+        '      "isbn10": "string",',
+        '      "oclc": "string",',
+        '      "lccn": "string"',
+        '    }',
+        '  }',
+        ']',
+        '',
+        `Description: ${description}`,
+    ].join('\n'),
 });
+
 
 module.exports = {
     MAX_CANDIDATES,
