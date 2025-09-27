@@ -13,7 +13,35 @@
     </header>
     <main>
         <div class="search-container">
-            <textarea id="search-box" placeholder="Please provide an excerpt or description of the work you are looking for." style="height: 150px;"></textarea>
+            <div class="search-box-wrapper">
+                <textarea id="search-box" placeholder="Please provide an excerpt or description of the work you are looking for."></textarea>
+                <button id="config-button" class="config-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="config-menu">
+                    <span class="sr-only">Open configuration</span>
+                    <svg class="config-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm9.94-4.1-1.9-.3a7.77 7.77 0 0 0-.72-1.74l1.14-1.56a.6.6 0 0 0-.07-.78l-1.8-1.8a.6.6 0 0 0-.78-.07l-1.56 1.14a7.77 7.77 0 0 0-1.74-.72l-.3-1.9a.6.6 0 0 0-.6-.51h-2.55a.6.6 0 0 0-.6.51l-.3 1.9a7.77 7.77 0 0 0-1.74.72L5.19 4.9a.6.6 0 0 0-.78.07L2.61 6.77a.6.6 0 0 0-.07.78l1.14 1.56c-.33.55-.6 1.14-.72 1.74l-1.9.3a.6.6 0 0 0-.51.6v2.55a.6.6 0 0 0 .51.6l1.9.3c.12.6.39 1.19.72 1.74L2.54 17a.6.6 0 0 0 .07.78l1.8 1.8a.6.6 0 0 0 .78.07l1.56-1.14c.55.33 1.14.6 1.74.72l.3 1.9a.6.6 0 0 0 .6.51h2.55a.6.6 0 0 0 .6-.51l.3-1.9c.6-.12 1.19-.39 1.74-.72l1.56 1.14a.6.6 0 0 0 .78-.07l1.8-1.8a.6.6 0 0 0 .07-.78l-1.14-1.56c.33-.55.6-1.14.72-1.74l1.9-.3a.6.6 0 0 0 .51-.6v-2.55a.6.6 0 0 0-.51-.6ZM12 17.2a5.2 5.2 0 1 1 0-10.4 5.2 5.2 0 0 1 0 10.4Z" />
+                    </svg>
+                </button>
+                <div id="config-menu" class="config-menu" role="dialog" aria-modal="false" aria-labelledby="config-menu-title" hidden>
+                    <h2 id="config-menu-title" class="config-menu__title">Configuration</h2>
+                    <form id="config-form" class="config-menu__form">
+                        <label for="config-catalog-domain" class="config-menu__label">Catalog domain</label>
+                        <input id="config-catalog-domain" class="config-menu__input" name="catalogDomain" type="url" placeholder="https://catalog.example.edu" autocomplete="off">
+                        <p class="config-menu__description">Used when building catalog result links.</p>
+                        <label for="config-debug" class="config-menu__toggle">
+                            <input id="config-debug" class="config-menu__checkbox" name="debug" type="checkbox">
+                            <span class="config-menu__toggle-text">
+                                <span class="config-menu__toggle-title">Debug mode</span>
+                                <span class="config-menu__toggle-description">When enabled, stay on this page after each search instead of redirecting.</span>
+                            </span>
+                        </label>
+                        <div class="config-menu__actions">
+                            <button type="submit" class="config-menu__button config-menu__button--primary">Save</button>
+                            <button type="button" id="config-reset" class="config-menu__button">Reset</button>
+                        </div>
+                        <p id="config-status" class="config-menu__status" role="status" aria-live="polite"></p>
+                    </form>
+                </div>
+            </div>
         </div>
         <div id="results-container"></div>
     </main>
