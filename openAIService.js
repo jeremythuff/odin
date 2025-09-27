@@ -9,6 +9,7 @@ const {
     parseCandidates,
     buildPrompt,
 } = require('./llmShared');
+const { buildUsageStats } = require('./usageMetrics');
 
 const resolveOpenAiModel = () =>
     sanitizeModelId(process.env.OPENAI_MODEL) ||
@@ -54,7 +55,7 @@ const requestOpenAiCompletion = (prompt) => {
                         try {
                             const data = JSON.parse(body);
                             const rawText = data?.choices?.[0]?.message?.content?.trim() || '';
-                            resolve({ rawText, model: data?.model || model });
+                            resolve({ rawText, model: data?.model || model, usage: data?.usage || null });
                         } catch (error) {
                             reject(new Error('Failed to parse response from OpenAI.'));
                         }
@@ -81,7 +82,7 @@ const convertDescriptionToIsbn = async (description) => {
     }
 
     const prompt = buildPrompt(trimmedDescription);
-    const { rawText: rawResponse, model } = await requestOpenAiCompletion(prompt);
+    const { rawText: rawResponse, model, usage: rawUsage } = await requestOpenAiCompletion(prompt);
 
     const candidates = parseCandidates(rawResponse);
     const topCandidate = candidates.find(
@@ -94,6 +95,7 @@ const convertDescriptionToIsbn = async (description) => {
         rawResponse,
         model,
         candidates,
+        usage: buildUsageStats('openai', model, rawUsage),
     };
 };
 

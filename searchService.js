@@ -23,6 +23,7 @@ const performSearch = async (query) => {
                 isbn: aiResult.isbn,
                 model: aiResult.model,
                 candidates: aiResult.candidates,
+                usage: aiResult.usage || null,
             },
             rawResponse: aiResult.rawResponse,
         };

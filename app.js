@@ -182,6 +182,113 @@ const formatConfidence = (confidence) => {
     return `${Math.round(confidence * 100)}%`;
 };
 
+const formatInteger = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+        return null;
+    }
+
+    return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+};
+
+const formatCurrencyValue = (value, currency = 'USD') => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+        return null;
+    }
+
+    try {
+        return value.toLocaleString(undefined, {
+            style: 'currency',
+            currency,
+            minimumFractionDigits: value >= 1 ? 2 : 4,
+            maximumFractionDigits: 6,
+        });
+    } catch (error) {
+        const decimals = value >= 1 ? 2 : value >= 0.01 ? 4 : 6;
+        const formattedValue = value.toFixed(decimals);
+        if (currency === 'USD') {
+            return `$${formattedValue}`;
+        }
+        return `${currency} ${formattedValue}`;
+    }
+};
+
+const formatUsageTokens = (usage) => {
+    if (!usage || typeof usage !== 'object') {
+        return '';
+    }
+
+    const parts = [];
+
+    const prompt = formatInteger(usage.promptTokens);
+    if (prompt) {
+        parts.push(`Prompt ${prompt}`);
+    }
+
+    const completion = formatInteger(usage.completionTokens);
+    if (completion) {
+        parts.push(`Completion ${completion}`);
+    }
+
+    const total = formatInteger(usage.totalTokens);
+    if (total) {
+        const includeTotal = (() => {
+            if (prompt && completion) {
+                return true;
+            }
+
+            if (!prompt && !completion) {
+                return true;
+            }
+
+            if (prompt && !completion) {
+                return total !== prompt;
+            }
+
+            if (!prompt && completion) {
+                return total !== completion;
+            }
+
+            return true;
+        })();
+
+        if (includeTotal) {
+            parts.push(`Total ${total}`);
+        }
+    }
+
+    return parts.join(' | ');
+};
+
+const formatUsageCost = (usage) => {
+    if (!usage || typeof usage !== 'object' || !usage.cost || typeof usage.cost !== 'object') {
+        return '';
+    }
+
+    const currency = typeof usage.cost.currency === 'string' && usage.cost.currency.trim()
+        ? usage.cost.currency.trim().toUpperCase()
+        : 'USD';
+
+    const total = formatCurrencyValue(usage.cost.total, currency);
+    const prompt = formatCurrencyValue(usage.cost.prompt, currency);
+    const completion = formatCurrencyValue(usage.cost.completion, currency);
+
+    const parts = [];
+
+    if (total) {
+        parts.push(`Total ${total}`);
+    }
+
+    if (prompt) {
+        parts.push(`Prompt ${prompt}`);
+    }
+
+    if (completion) {
+        parts.push(`Completion ${completion}`);
+    }
+
+    return parts.join(' | ');
+};
+
 const formatIdentifiers = (identifiers = {}) => {
     const labelMap = [
         ['title', 'Title'],
@@ -301,6 +408,28 @@ const renderResult = (payload) => {
                 <span class="result-summary__value">${escapeHtml(result.model)}</span>
             </div>
         `);
+    }
+
+    if (result?.usage) {
+        const tokensSummary = formatUsageTokens(result.usage);
+        if (tokensSummary) {
+            summaryItems.push(`
+                <div class="result-summary__item">
+                    <span class="result-summary__label">Tokens</span>
+                    <span class="result-summary__value">${escapeHtml(tokensSummary)}</span>
+                </div>
+            `);
+        }
+
+        const costSummary = formatUsageCost(result.usage);
+        if (costSummary) {
+            summaryItems.push(`
+                <div class="result-summary__item">
+                    <span class="result-summary__label">Estimated Cost</span>
+                    <span class="result-summary__value">${escapeHtml(costSummary)}</span>
+                </div>
+            `);
+        }
     }
 
     if (summaryItems.length) {

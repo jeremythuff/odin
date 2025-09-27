@@ -10,6 +10,7 @@ const {
     parseCandidates,
     buildPrompt,
 } = require('./llmShared');
+const { buildUsageStats } = require('./usageMetrics');
 
 const resolveClaudeModel = () =>
     sanitizeModelId(process.env.CLAUDE_MODEL) || 'claude-3-haiku-20240307';
@@ -70,7 +71,7 @@ const requestClaudeCompletion = (prompt) => {
                                 ? data.content.find((part) => part && part.type === 'text')
                                 : null;
                             const rawText = typeof textPart?.text === 'string' ? textPart.text.trim() : '';
-                            resolve({ rawText, model: data?.model || model });
+                            resolve({ rawText, model: data?.model || model, usage: data?.usage || null });
                         } catch (error) {
                             reject(new Error('Failed to parse response from Claude.'));
                         }
@@ -97,7 +98,7 @@ const convertDescriptionToIsbn = async (description) => {
     }
 
     const prompt = buildPrompt(trimmedDescription);
-    const { rawText: rawResponse, model } = await requestClaudeCompletion(prompt);
+    const { rawText: rawResponse, model, usage: rawUsage } = await requestClaudeCompletion(prompt);
 
     const candidates = parseCandidates(rawResponse);
     const topCandidate = candidates.find(
@@ -110,6 +111,7 @@ const convertDescriptionToIsbn = async (description) => {
         rawResponse,
         model,
         candidates,
+        usage: buildUsageStats('claude', model, rawUsage),
     };
 };
 
