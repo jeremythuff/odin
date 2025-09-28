@@ -1,4 +1,4 @@
-const { resolveProvider } = require('./llmShared');
+const { resolveProvider, normalizeProvider } = require('./llmShared');
 const { convertDescriptionToIsbn: convertWithOpenAi } = require('./openAIService');
 const { convertDescriptionToIsbn: convertWithAnthropic } = require('./anthropicService');
 
@@ -7,10 +7,11 @@ const providerHandlers = {
     claude: convertWithAnthropic,
 };
 
-const performSearch = async (query) => {
+const performSearch = async (query, options = {}) => {
     const normalizedQuery = (query ?? '').trim();
 
-    const provider = resolveProvider();
+    const requestedProvider = normalizeProvider(options.provider);
+    const provider = requestedProvider || resolveProvider();
     const handler = providerHandlers[provider] || providerHandlers.openai;
 
     try {

@@ -13,20 +13,27 @@ const sanitizeModelId = (value) => {
     return trimmed.endsWith(';') ? trimmed.slice(0, -1) : trimmed;
 };
 
-const resolveProvider = () => {
-    const rawProvider = process.env.LLM_PROVIDER;
-    const normalized = typeof rawProvider === 'string' ? rawProvider.trim().toLowerCase() : '';
-
-    if (['claude', 'anthropic', 'claude-3'].includes(normalized)) {
-        return 'claude';
-    }
-
-    if (['openai', 'gpt', 'chatgpt'].includes(normalized)) {
-        return 'openai';
-    }
-
-    return 'openai';
+const PROVIDER_ALIASES = {
+    claude: ['claude', 'anthropic', 'claude-3', 'claude3', 'claud'],
+    openai: ['openai', 'gpt', 'chatgpt', 'gpt-4', 'gpt4', 'gpt-3.5', 'gpt3.5'],
 };
+
+const normalizeProvider = (value) => {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (!normalized) {
+        return null;
+    }
+
+    for (const [provider, aliases] of Object.entries(PROVIDER_ALIASES)) {
+        if (aliases.includes(normalized)) {
+            return provider;
+        }
+    }
+
+    return null;
+};
+
+const resolveProvider = () => normalizeProvider(process.env.LLM_PROVIDER) || 'openai';
 
 const resolveTemperature = () => {
     const raw = process.env.LLM_TEMPERATURE ?? process.env.MODEL_TEMPERATURE;
@@ -260,7 +267,9 @@ module.exports = {
     MAX_CANDIDATES,
     sanitizeModelId,
     resolveProvider,
+    normalizeProvider,
     resolveTemperature,
     parseCandidates,
     buildPrompt,
+    PROVIDER_ALIASES,
 };

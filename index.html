@@ -27,6 +27,12 @@
                         <label for="config-catalog-domain" class="config-menu__label">Catalog domain</label>
                         <input id="config-catalog-domain" class="config-menu__input" name="catalogDomain" type="url" placeholder="https://catalog.example.edu" autocomplete="off">
                         <p class="config-menu__description">Used when building catalog result links.</p>
+                        <label for="config-provider" class="config-menu__label">LLM provider</label>
+                        <select id="config-provider" class="config-menu__select" name="provider">
+                            <option value="openai">OpenAI (ChatGPT)</option>
+                            <option value="claude">Claude</option>
+                        </select>
+                        <p class="config-menu__description">Choose which model processes future searches.</p>
                         <label for="config-debug" class="config-menu__toggle">
                             <input id="config-debug" class="config-menu__checkbox" name="debug" type="checkbox">
                             <span class="config-menu__toggle-text">

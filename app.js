@@ -4,6 +4,7 @@ const configButton = document.getElementById('config-button');
 const configMenu = document.getElementById('config-menu');
 const configForm = document.getElementById('config-form');
 const configCatalogInput = document.getElementById('config-catalog-domain');
+const configProviderSelect = document.getElementById('config-provider');
 const configStatus = document.getElementById('config-status');
 const configDebugInput = document.getElementById('config-debug');
 const configResetButton = document.getElementById('config-reset');
@@ -36,6 +37,16 @@ const DEFAULT_DEBUG_MODE = false;
 let debugMode = DEFAULT_DEBUG_MODE;
 let serverDebugMode = DEFAULT_DEBUG_MODE;
 let lastCatalogResultsUrl = null;
+
+const PROVIDER_LABELS = {
+    openai: 'OpenAI (ChatGPT)',
+    claude: 'Claude',
+};
+
+const DEFAULT_PROVIDER = 'openai';
+let availableProviders = new Set(Object.keys(PROVIDER_LABELS));
+let llmProvider = DEFAULT_PROVIDER;
+let serverProvider = DEFAULT_PROVIDER;
 
 const DEFAULT_CAPTCHA_CONFIG = { enabled: false, provider: null, siteKey: null };
 let captchaConfigState = { ...DEFAULT_CAPTCHA_CONFIG };
@@ -93,6 +104,94 @@ const normalizeBoolean = (value, fallback = false) => {
     }
 
     return fallback;
+};
+
+const getProviderLabel = (value) => {
+    if (!value) {
+        return '';
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (PROVIDER_LABELS[normalized]) {
+        return PROVIDER_LABELS[normalized];
+    }
+
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const normalizeProviderValue = (value, fallback = DEFAULT_PROVIDER) => {
+    if (typeof value !== 'string') {
+        return fallback;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+        return fallback;
+    }
+
+    if (availableProviders.has(normalized)) {
+        return normalized;
+    }
+
+    return fallback;
+};
+
+function setProvider(value, options = {}) {
+    const { fallback = DEFAULT_PROVIDER, updateSelect = true } = options;
+    const normalized = normalizeProviderValue(value, fallback);
+    llmProvider = normalized;
+
+    if (updateSelect && configProviderSelect) {
+        configProviderSelect.value = normalized;
+    }
+
+    return llmProvider;
+}
+
+const ensureProviderOptions = (providers = [], ensureValues = []) => {
+    const unique = [];
+    const addValue = (candidate) => {
+        if (typeof candidate !== 'string') {
+            return;
+        }
+
+        const normalized = candidate.trim().toLowerCase();
+        if (!normalized || unique.includes(normalized)) {
+            return;
+        }
+
+        unique.push(normalized);
+    };
+
+    if (Array.isArray(providers)) {
+        providers.forEach(addValue);
+    }
+
+    ensureValues.forEach(addValue);
+
+    if (!unique.length) {
+        unique.push(DEFAULT_PROVIDER);
+    }
+
+    availableProviders = new Set(unique);
+
+    if (configProviderSelect) {
+        const fragment = document.createDocumentFragment();
+        unique.forEach((provider) => {
+            const option = document.createElement('option');
+            option.value = provider;
+            option.textContent = getProviderLabel(provider);
+            fragment.appendChild(option);
+        });
+
+        configProviderSelect.innerHTML = '';
+        configProviderSelect.appendChild(fragment);
+        if (!availableProviders.has(llmProvider)) {
+            setProvider(unique[0] || DEFAULT_PROVIDER);
+        } else {
+            configProviderSelect.value = llmProvider;
+        }
+    }
 };
 
 const setDebugMode = (value) => {
@@ -818,7 +917,7 @@ const performSearch = async () => {
     lastRenderedPayload = null;
     lastCatalogResultsUrl = null;
 
-    const payloadBody = { query };
+    const payloadBody = { query, provider: llmProvider };
     const captchaTokenToSend = captchaConfigState.enabled ? captchaToken : '';
     if (captchaConfigState.enabled && captchaTokenToSend) {
         payloadBody.captchaToken = captchaTokenToSend;
@@ -898,13 +997,28 @@ const initializeConfig = async () => {
                     fetchedDebugMode = normalizeBoolean(payload.debug, DEFAULT_DEBUG_MODE);
                 }
 
+                ensureProviderOptions(Array.isArray(payload.providers) ? payload.providers : [], [payload.provider, DEFAULT_PROVIDER]);
+                const appliedProvider = setProvider(payload.provider, { fallback: DEFAULT_PROVIDER });
+                serverProvider = appliedProvider;
+
                 await applyCaptchaConfig(payload.captcha);
+            } else {
+                ensureProviderOptions([], [DEFAULT_PROVIDER]);
+                setProvider(DEFAULT_PROVIDER);
+                serverProvider = DEFAULT_PROVIDER;
+                await applyCaptchaConfig(null);
             }
         } else {
+            ensureProviderOptions([], [DEFAULT_PROVIDER]);
+            setProvider(DEFAULT_PROVIDER);
+            serverProvider = DEFAULT_PROVIDER;
             await applyCaptchaConfig(null);
         }
     } catch (error) {
         console.error('Unable to load configuration:', error);
+        ensureProviderOptions([], [DEFAULT_PROVIDER]);
+        setProvider(DEFAULT_PROVIDER);
+        serverProvider = DEFAULT_PROVIDER;
         await applyCaptchaConfig(null);
     }
 
@@ -922,6 +1036,10 @@ const initializeConfig = async () => {
 
         if (Object.prototype.hasOwnProperty.call(stored, 'debug')) {
             applyDebugMode(stored.debug, { fallback: serverDebugMode });
+        }
+
+        if (stored.provider) {
+            setProvider(stored.provider, { fallback: serverProvider });
         }
     }
 };
@@ -944,6 +1062,13 @@ if (configButton && configMenu) {
 if (configMenu) {
     configMenu.addEventListener('click', (event) => {
         event.stopPropagation();
+    });
+}
+
+if (configProviderSelect) {
+    configProviderSelect.addEventListener('change', (event) => {
+        const selected = typeof event.target.value === 'string' ? event.target.value : llmProvider;
+        setProvider(selected, { fallback: llmProvider, updateSelect: false });
     });
 }
 
@@ -978,8 +1103,10 @@ if (configForm) {
 
         const appliedDomain = applyCatalogDomain(normalized);
         const appliedDebug = applyDebugMode(configDebugInput ? configDebugInput.checked : debugMode, { fallback: debugMode });
+        const selectedProvider = configProviderSelect ? configProviderSelect.value : llmProvider;
+        const appliedProvider = setProvider(selectedProvider, { fallback: llmProvider });
 
-        const persisted = saveStoredConfig({ catalogDomain: appliedDomain, debug: appliedDebug });
+        const persisted = saveStoredConfig({ catalogDomain: appliedDomain, debug: appliedDebug, provider: appliedProvider });
 
         if (persisted) {
             updateConfigStatus('Configuration updated.');
@@ -996,6 +1123,7 @@ if (configResetButton) {
         const cleared = clearStoredConfig();
         applyCatalogDomain(serverCatalogDomain);
         applyDebugMode(serverDebugMode, { fallback: DEFAULT_DEBUG_MODE });
+        setProvider(serverProvider);
 
         if (cleared) {
             updateConfigStatus('Configuration reset to server defaults.');

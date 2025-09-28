@@ -6,6 +6,7 @@ const path = require('path');
 const { URL } = require('url');
 const searchService = require('./searchService');
 const { getCaptchaConfig, verifyCaptchaToken } = require('./captchaService');
+const { resolveProvider, normalizeProvider, PROVIDER_ALIASES } = require('./llmShared');
 
 const STATIC_ROOT = __dirname;
 const DEFAULT_CATALOG_DOMAIN = 'https://catalog.library.tamu.edu';
@@ -49,6 +50,8 @@ const parseBoolean = (value, fallback = false) => {
 
 const debugMode = parseBoolean(process.env.DEBUG, DEFAULT_DEBUG_MODE);
 const captchaConfig = getCaptchaConfig();
+const defaultProvider = resolveProvider();
+const providerOptions = Object.keys(PROVIDER_ALIASES).sort();
 
 const RATE_LIMIT_MAX_REQUESTS = (() => {
     const parsed = Number(process.env.RATE_LIMIT_MAX_REQUESTS);
@@ -204,6 +207,7 @@ const handleSearchRequest = async (req, res) => {
             return {
                 query: requestUrl.searchParams.get('q') || '',
                 captchaToken: requestUrl.searchParams.get('captchaToken') || '',
+                provider: requestUrl.searchParams.get('provider') || '',
             };
         }
 
@@ -214,6 +218,7 @@ const handleSearchRequest = async (req, res) => {
                 return {
                     query: typeof parsed.query === 'string' ? parsed.query : '',
                     captchaToken: typeof parsed.captchaToken === 'string' ? parsed.captchaToken : '',
+                    provider: typeof parsed.provider === 'string' ? parsed.provider : '',
                 };
             } catch (error) {
                 if (error instanceof SyntaxError) {
@@ -244,7 +249,10 @@ const handleSearchRequest = async (req, res) => {
             }
         }
 
-        const results = await searchService.performSearch(normalizedQuery);
+        const requestedProvider = normalizeProvider(payload.provider);
+        const searchOptions = requestedProvider ? { provider: requestedProvider } : undefined;
+
+        const results = await searchService.performSearch(normalizedQuery, searchOptions);
         const statusCode = results.ok ? 200 : 502;
         respond(statusCode, results);
     } catch (error) {
@@ -263,7 +271,14 @@ const handleApiRequest = async (req, res) => {
     }
 
     if (pathname === '/api/config' && req.method === 'GET') {
-        sendJson(res, 200, { ok: true, catalogDomain, debug: debugMode, captcha: captchaConfig });
+        sendJson(res, 200, {
+            ok: true,
+            catalogDomain,
+            debug: debugMode,
+            captcha: captchaConfig,
+            provider: defaultProvider,
+            providers: providerOptions,
+        });
         return;
     }
 
