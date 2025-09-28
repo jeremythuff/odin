@@ -38,7 +38,7 @@ const resolveProvider = () => normalizeProvider(process.env.LLM_PROVIDER) || 'op
 const resolveTemperature = () => {
     const raw = process.env.LLM_TEMPERATURE ?? process.env.MODEL_TEMPERATURE;
     const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : 0.2;
+    return Number.isFinite(parsed) ? parsed : 1.0;
 };
 
 const normalizeIsbn = (text) => {
