@@ -1,14 +1,27 @@
-version: "3.9"
-
 services:
-  web:
-    build: .
-    env_file:
-      - .env
+  odin-web:
+    image: odin:latest
     environment:
-      HOST: 0.0.0.0
       NODE_ENV: production
+      HOST: 0.0.0.0
       PORT: ${PORT:-8000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      DEFAULT_OPENAI_MODEL: ${DEFAULT_OPENAI_MODEL}
+      LLM_PROVIDER: ${LLM_PROVIDER}
+      CATALOG_DOMAIN: ${CATALOG_DOMAIN}
+      DEBUG: ${DEBUG}
+      HCAPTCHA_SITE_KEY: ${HCAPTCHA_SITE_KEY}
+      HCAPTCHA_SECRET_KEY: ${HCAPTCHA_SECRET_KEY}
+      CAPTCHA_PROVIDER: ${CAPTCHA_PROVIDER}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
     ports:
-      - "${PORT:-8000}:8000"
+      - "8111:${PORT:-8000}"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${PORT:-8000}/api/health | grep -q '\"ok\":true' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
