@@ -29,7 +29,7 @@ const requestOpenAiCompletion = (prompt) => {
             { role: 'system', content: prompt.system },
             { role: 'user', content: prompt.user },
         ],
-        temperature: resolveTemperature(),
+        //temperature: resolveTemperature(),
     });
 
     return new Promise((resolve, reject) => {

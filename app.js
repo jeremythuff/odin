@@ -333,6 +333,73 @@ const resetCaptcha = () => {
     captchaToken = null;
 };
 
+const buildCandidateSearchEntries = (candidate) => {
+    if (!candidate) {
+        return [];
+    }
+
+    const entries = [];
+
+    const title = candidate.title || candidate.identifiers?.title;
+    if (title) {
+        entries.push({ value: title, type: 'Title' });
+    }
+
+    const author = (() => {
+        if (Array.isArray(candidate.authors) && candidate.authors.length) {
+            return candidate.authors[0];
+        }
+
+        const identifiersAuthor = candidate.identifiers?.author;
+        if (typeof identifiersAuthor === 'string' && identifiersAuthor.trim()) {
+            return identifiersAuthor.split(',')[0].trim();
+        }
+
+        return null;
+    })();
+    if (author) {
+        entries.push({ value: author, type: 'Author' });
+    }
+
+    const yearValue = candidate.year || candidate.identifiers?.yearOfPublication;
+    if (yearValue) {
+        entries.push({ value: String(yearValue), type: 'year' });
+    }
+
+    const isbnValue = candidate.identifiers?.isbn13 || candidate.identifiers?.isbn10;
+    if (isbnValue) {
+        entries.push({ value: isbnValue, type: 'ISN' });
+    }
+
+    return entries;
+};
+
+const applySearchEntriesToParams = (params, entries, groupIndex = 0) => {
+    if (!entries.length) {
+        return false;
+    }
+
+    entries.forEach(({ value, type }) => {
+        if (!value) {
+            return;
+        }
+
+        params.append(`lookfor${groupIndex}[]`, value);
+        params.append(`type${groupIndex}[]`, type);
+    });
+
+    params.append(`bool${groupIndex}[]`, 'OR');
+    return true;
+};
+
+const finalizeCatalogParams = (params) => {
+    params.set('illustration', '-1');
+    params.append('daterange[]', 'publishDate');
+    params.set('publishDatefrom', '');
+    params.set('publishDateto', '');
+    return params;
+};
+
 const buildCatalogResultsUrl = (candidates = []) => {
     if (!Array.isArray(candidates) || !candidates.length) {
         return null;
@@ -344,69 +411,43 @@ const buildCatalogResultsUrl = (candidates = []) => {
 
     let groupIndex = 0;
 
-    const addEntry = (index, value, type) => {
-        if (!value) {
-            return;
-        }
-
-        params.append(`lookfor${index}[]`, value);
-        params.append(`type${index}[]`, type);
-    };
-
     candidates.forEach((candidate) => {
-        const entries = [];
-
-        const title = candidate.title || candidate.identifiers?.title;
-        if (title) {
-            entries.push({ value: title, type: 'Title' });
-        }
-
-        const author = (() => {
-            if (Array.isArray(candidate.authors) && candidate.authors.length) {
-                return candidate.authors[0];
-            }
-
-            const identifiersAuthor = candidate.identifiers?.author;
-            if (typeof identifiersAuthor === 'string' && identifiersAuthor.trim()) {
-                return identifiersAuthor.split(',')[0].trim();
-            }
-
-            return null;
-        })();
-        if (author) {
-            entries.push({ value: author, type: 'Author' });
-        }
-
-        const yearValue = candidate.year || candidate.identifiers?.yearOfPublication;
-        if (yearValue) {
-            entries.push({ value: String(yearValue), type: 'year' });
-        }
-
-        const isbnValue = candidate.identifiers?.isbn13 || candidate.identifiers?.isbn10;
-        if (isbnValue) {
-            entries.push({ value: isbnValue, type: 'ISN' });
-        }
-
+        const entries = buildCandidateSearchEntries(candidate);
         if (!entries.length) {
             return;
         }
 
-        entries.forEach(({ value, type }) => {
-            addEntry(groupIndex, value, type);
-        });
-
-        params.append(`bool${groupIndex}[]`, 'OR');
-        groupIndex += 1;
+        const applied = applySearchEntriesToParams(params, entries, groupIndex);
+        if (applied) {
+            groupIndex += 1;
+        }
     });
 
     if (groupIndex === 0) {
         return null;
     }
 
-    params.set('illustration', '-1');
-    params.append('daterange[]', 'publishDate');
-    params.set('publishDatefrom', '');
-    params.set('publishDateto', '');
+    finalizeCatalogParams(params);
+
+    return `${baseUrl}?${params.toString()}`;
+};
+
+const buildCandidateCatalogUrl = (candidate) => {
+    const entries = buildCandidateSearchEntries(candidate);
+    if (!entries.length) {
+        return null;
+    }
+
+    const baseUrl = getCatalogResultsBaseUrl();
+    const params = new URLSearchParams();
+    params.set('join', 'OR');
+
+    const applied = applySearchEntriesToParams(params, entries, 0);
+    if (!applied) {
+        return null;
+    }
+
+    finalizeCatalogParams(params);
 
     return `${baseUrl}?${params.toString()}`;
 };
@@ -576,11 +617,22 @@ const formatCandidateHtml = (candidate, index) => {
     const identifiers = formatIdentifiers(candidate.identifiers || {});
     const confidence = formatConfidence(candidate.confidence);
     const evidence = candidate.evidence ? escapeHtml(candidate.evidence) : '';
+    const candidateCatalogUrl = buildCandidateCatalogUrl(candidate);
 
     const meta = [
         formatMetaItem('Year', year),
         formatMetaItem('Language', language),
     ].filter(Boolean).join('');
+
+    const catalogLink = candidateCatalogUrl
+        ? `
+            <div class="candidate-card__footer">
+                <a class="candidate-card__catalog-link" href="${escapeHtml(candidateCatalogUrl)}" target="_blank" rel="noopener noreferrer">
+                    Search this candidate in catalog
+                </a>
+            </div>
+        `
+        : '';
 
     return `
         <li class="candidate-card">
@@ -595,6 +647,7 @@ const formatCandidateHtml = (candidate, index) => {
             ${meta ? `<div class="candidate-card__meta">${meta}</div>` : ''}
             ${identifiers}
             ${evidence ? `<p class="candidate-card__evidence">${evidence}</p>` : ''}
+            ${catalogLink}
         </li>
     `;
 };

@@ -419,6 +419,30 @@ main {
     margin-bottom: 0.35rem;
 }
 
+.candidate-card__footer {
+    margin-top: 1rem;
+}
+
+.candidate-card__catalog-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    color: #3f51b5;
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.candidate-card__catalog-link::after {
+    content: '\2197';
+    font-size: 0.9rem;
+}
+
+.candidate-card__catalog-link:hover,
+.candidate-card__catalog-link:focus-visible {
+    text-decoration: underline;
+}
+
 .result-loading {
     display: inline-flex;
     align-items: center;
