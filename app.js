@@ -1,4 +1,5 @@
 const searchBox = document.getElementById('search-box');
+const searchSubmitButton = document.getElementById('search-submit');
 const resultsContainer = document.getElementById('results-container');
 const configButton = document.getElementById('config-button');
 const configMenu = document.getElementById('config-menu');
@@ -1103,6 +1104,13 @@ searchBox.addEventListener('keydown', (event) => {
         performSearch();
     }
 });
+
+if (searchSubmitButton) {
+    searchSubmitButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        performSearch();
+    });
+}
 
 if (configButton && configMenu) {
     configButton.addEventListener('click', (event) => {
