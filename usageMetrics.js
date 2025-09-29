@@ -52,6 +52,10 @@ const basePricing = (() => {
             'claude-3-haiku-20240307': { input: 0.00025, output: 0.00125 },
             'claude-3-sonnet-20240229': { input: 0.003, output: 0.015 },
         }),
+        gemini: normalizeKeys({
+            'gemini-1.5-flash-latest': { input: 0.00035, output: 0.00053 },
+            'gemini-1.5-pro-latest': { input: 0.0035, output: 0.0105 },
+        }),
     };
 })();
 
@@ -203,6 +207,16 @@ const buildUsageStats = (provider, model, rawUsage) => {
         promptTokens = toFiniteNumber(rawUsage.input_tokens ?? rawUsage.prompt_tokens);
         completionTokens = toFiniteNumber(rawUsage.output_tokens ?? rawUsage.completion_tokens);
         totalTokens = toFiniteNumber(rawUsage.total_tokens ?? rawUsage.tokens);
+    } else if (providerKey === 'gemini') {
+        promptTokens = toFiniteNumber(
+            rawUsage.promptTokenCount ?? rawUsage.prompt_tokens ?? rawUsage.input_tokens
+        );
+        completionTokens = toFiniteNumber(
+            rawUsage.candidatesTokenCount ?? rawUsage.completion_tokens ?? rawUsage.output_tokens
+        );
+        totalTokens = toFiniteNumber(
+            rawUsage.totalTokenCount ?? rawUsage.total_tokens ?? rawUsage.tokens
+        );
     } else {
         promptTokens = toFiniteNumber(rawUsage.prompt_tokens ?? rawUsage.input_tokens ?? rawUsage.total_tokens);
         completionTokens = toFiniteNumber(rawUsage.completion_tokens ?? rawUsage.output_tokens);

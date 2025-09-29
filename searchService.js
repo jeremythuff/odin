@@ -1,10 +1,12 @@
 const { resolveProvider, normalizeProvider } = require('./llmShared');
 const { convertDescriptionToIsbn: convertWithOpenAi } = require('./openAIService');
 const { convertDescriptionToIsbn: convertWithAnthropic } = require('./anthropicService');
+const { convertDescriptionToIsbn: convertWithGemini } = require('./geminiService');
 
 const providerHandlers = {
     openai: convertWithOpenAi,
     claude: convertWithAnthropic,
+    gemini: convertWithGemini,
 };
 
 const performSearch = async (query, options = {}) => {

@@ -16,6 +16,7 @@ const sanitizeModelId = (value) => {
 const PROVIDER_ALIASES = {
     claude: ['claude', 'anthropic', 'claude-3', 'claude3', 'claud'],
     openai: ['openai', 'gpt', 'chatgpt', 'gpt-4', 'gpt4', 'gpt-3.5', 'gpt3.5'],
+    gemini: ['gemini', 'google', 'google-ai', 'gemini-1.5', 'gemini1.5', 'gemini-pro'],
 };
 
 const normalizeProvider = (value) => {

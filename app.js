@@ -42,6 +42,7 @@ let lastCatalogResultsUrl = null;
 const PROVIDER_LABELS = {
     openai: 'OpenAI (ChatGPT)',
     claude: 'Claude',
+    gemini: 'Gemini',
 };
 
 const DEFAULT_PROVIDER = 'openai';

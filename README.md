@@ -3,13 +3,31 @@ Open Discovery Interface
 
 ODIn is an AI Empowered Bibliographic Discovery Interface.
 
-## OpenAI configuration
+## LLM configuration
 
-Set the following environment variables before starting the server so that the application can contact OpenAI's API:
+Use the following environment variables to enable the different language model providers when starting the server:
+
+### OpenAI
 
 - `OPENAI_API_KEY`: A valid OpenAI API key.
-- `OPENAI_MODEL` (optional): The chat completion model to use. Defaults to `gpt-3.5-turbo` if not provided.
-- `LLM_PROVIDER`: Controls which backend is used. Set to `openai`/`chatgpt`/`gpt` to call OpenAI or `claude`/`anthropic` to call Claude. If omitted or unrecognised, OpenAI is used by default.
+- `OPENAI_MODEL` (optional): The chat completion model to use. Defaults to `gpt-4.1-mini` if not provided.
+
+### Anthropic Claude
+
+- `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY`): A valid Anthropic API key.
+- `CLAUDE_MODEL` (optional): Claude model identifier. Defaults to `claude-3-haiku-20240307`.
+- `CLAUDE_MAX_TOKENS` (optional): Maximum completion tokens to request (up to 4000).
+
+### Google Gemini
+
+- `GEMINI_API_KEY` (or `GOOGLE_API_KEY`): A valid Gemini API key.
+- `GEMINI_MODEL` (optional): Gemini model identifier. Defaults to `gemini-pro`.
+- `GEMINI_API_VERSION` (optional): API version segment, defaults to `v1`.
+- `GEMINI_API_HOSTNAME` (optional): Override the Gemini host if needed, defaults to `generativelanguage.googleapis.com`.
+
+### Selecting the provider
+
+Set `LLM_PROVIDER` to choose which backend processes requests. Supported values include `openai`, `claude`, and `gemini` (plus common aliases such as `gpt`, `anthropic`, or `google`). If omitted or unrecognised, OpenAI is used by default.
 
 These values are read by the backend service when processing search requests that convert descriptions or excerpts into ISBNs.
 
