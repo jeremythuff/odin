@@ -58,6 +58,9 @@ let captchaWidgetId = null;
 let captchaReady = false;
 let captchaLoadPromise = null;
 let captchaError = null;
+let captchaPassiveMode = false;
+let pendingCaptchaTokenPromise = null;
+const captchaTokenWaiters = [];
 
 if (captchaContainer) {
     captchaContainer.hidden = true;
@@ -243,6 +246,114 @@ const loadCaptchaScript = () => {
     return captchaLoadPromise;
 };
 
+const resolveCaptchaTokenWaiters = (token) => {
+    if (!captchaTokenWaiters.length) {
+        return;
+    }
+
+    const waiters = captchaTokenWaiters.splice(0, captchaTokenWaiters.length);
+    waiters.forEach((waiter) => {
+        try {
+            waiter.resolve(token);
+        } catch (error) {
+            console.error('Error resolving captcha waiter:', error);
+        }
+    });
+};
+
+const rejectCaptchaTokenWaiters = (reason) => {
+    if (!captchaTokenWaiters.length) {
+        return;
+    }
+
+    const waiters = captchaTokenWaiters.splice(0, captchaTokenWaiters.length);
+    waiters.forEach((waiter) => {
+        try {
+            waiter.reject(reason);
+        } catch (error) {
+            console.error('Error rejecting captcha waiter:', error);
+        }
+    });
+};
+
+const enterCaptchaPassiveMode = () => {
+    if (captchaPassiveMode) {
+        return;
+    }
+
+    captchaPassiveMode = true;
+    if (captchaContainer) {
+        captchaContainer.hidden = true;
+        captchaContainer.classList.add('captcha-container--passive');
+    }
+};
+
+const requestCaptchaToken = () => {
+    if (!captchaConfigState.enabled) {
+        return Promise.resolve('');
+    }
+
+    if (captchaToken) {
+        return Promise.resolve(captchaToken);
+    }
+
+    if (pendingCaptchaTokenPromise) {
+        return pendingCaptchaTokenPromise;
+    }
+
+    if (!captchaApi || typeof captchaApi.execute !== 'function' || captchaWidgetId === null) {
+        return Promise.reject(new Error('Captcha is not ready yet.'));
+    }
+
+    pendingCaptchaTokenPromise = new Promise((resolve, reject) => {
+        const waiter = {
+            resolve: (value) => {
+                pendingCaptchaTokenPromise = null;
+                resolve(value);
+            },
+            reject: (error) => {
+                pendingCaptchaTokenPromise = null;
+                reject(error);
+            },
+        };
+
+        captchaTokenWaiters.push(waiter);
+
+        try {
+            if (captchaPassiveMode && typeof captchaApi.reset === 'function') {
+                captchaApi.reset(captchaWidgetId);
+            }
+            captchaApi.execute(captchaWidgetId);
+        } catch (error) {
+            const index = captchaTokenWaiters.indexOf(waiter);
+            if (index >= 0) {
+                captchaTokenWaiters.splice(index, 1);
+            }
+            pendingCaptchaTokenPromise = null;
+            reject(error);
+        }
+    });
+
+    return pendingCaptchaTokenPromise;
+};
+
+const ensureCaptchaToken = async () => {
+    if (!captchaConfigState.enabled) {
+        return '';
+    }
+
+    if (captchaToken) {
+        return captchaToken;
+    }
+
+    if (!captchaPassiveMode) {
+        return null;
+    }
+
+    const token = await requestCaptchaToken();
+    return token;
+};
+
 const disableCaptcha = () => {
     if (captchaApi && typeof captchaApi.remove === 'function' && captchaWidgetId !== null) {
         try {
@@ -259,10 +370,14 @@ const disableCaptcha = () => {
     captchaReady = false;
     captchaLoadPromise = null;
     captchaError = null;
+    captchaPassiveMode = false;
+    pendingCaptchaTokenPromise = null;
+    rejectCaptchaTokenWaiters(new Error('Captcha disabled.'));
 
     if (captchaContainer) {
         captchaContainer.hidden = true;
         captchaContainer.innerHTML = '';
+        captchaContainer.classList.remove('captcha-container--passive');
     }
 };
 
@@ -274,6 +389,10 @@ const renderCaptchaWidget = async (config) => {
 
     captchaContainer.hidden = false;
     captchaContainer.innerHTML = '';
+    captchaContainer.classList.remove('captcha-container--passive');
+    captchaPassiveMode = false;
+    pendingCaptchaTokenPromise = null;
+    rejectCaptchaTokenWaiters(new Error('Captcha widget reinitializing.'));
 
     try {
         const api = await loadCaptchaScript(config.siteKey);
@@ -282,12 +401,18 @@ const renderCaptchaWidget = async (config) => {
             sitekey: config.siteKey,
             callback: (token) => {
                 captchaToken = token;
+                resolveCaptchaTokenWaiters(token);
+                if (token) {
+                    enterCaptchaPassiveMode();
+                }
             },
             'expired-callback': () => {
                 captchaToken = null;
+                rejectCaptchaTokenWaiters(new Error('Captcha expired.'));
             },
             'error-callback': () => {
                 captchaToken = null;
+                rejectCaptchaTokenWaiters(new Error('Captcha error.'));
             },
         });
         captchaReady = true;
@@ -328,11 +453,15 @@ const resetCaptcha = () => {
         return;
     }
 
+    captchaToken = null;
+
+    if (captchaPassiveMode) {
+        return;
+    }
+
     if (captchaApi && typeof captchaApi.reset === 'function' && captchaWidgetId !== null) {
         captchaApi.reset(captchaWidgetId);
     }
-
-    captchaToken = null;
 };
 
 const buildCandidateSearchEntries = (candidate) => {
@@ -677,8 +806,11 @@ const renderResult = (payload) => {
     const summaryItems = [];
     if (query) {
         summaryItems.push(`
-            <div class="result-summary__item">
-                <span class="result-summary__label">Query</span>
+            <div class="result-summary__item result-summary__item--query">
+                <div class="result-summary__item-header">
+                    <span class="result-summary__label">Query</span>
+                    <button type="button" class="result-summary__refine">Refine</button>
+                </div>
                 <span class="result-summary__value">${escapeHtml(query)}</span>
             </div>
         `);
@@ -953,6 +1085,18 @@ const performSearch = async () => {
             return;
         }
 
+        if (!captchaToken && captchaPassiveMode) {
+            try {
+                await ensureCaptchaToken();
+            } catch (error) {
+                showResultsContainer();
+                resultsContainer.innerHTML = `<p class="error">${escapeHtml(
+                    error.message || 'Captcha is unavailable. Please try again later.'
+                )}</p>`;
+                return;
+            }
+        }
+
         if (!captchaToken) {
             showResultsContainer();
             resultsContainer.innerHTML = '<p class="error">Please complete the captcha challenge before searching.</p>';
@@ -1110,6 +1254,20 @@ if (searchSubmitButton) {
     searchSubmitButton.addEventListener('click', (event) => {
         event.preventDefault();
         performSearch();
+    });
+}
+
+if (resultsContainer) {
+    resultsContainer.addEventListener('click', (event) => {
+        const target = event.target;
+        if (target && target.classList.contains('result-summary__refine')) {
+            event.preventDefault();
+
+            if (searchBox && lastRenderedPayload && typeof lastRenderedPayload.query === 'string') {
+                searchBox.value = lastRenderedPayload.query;
+                searchBox.focus();
+            }
+        }
     });
 }
 
