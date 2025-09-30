@@ -281,10 +281,18 @@ const enterCaptchaPassiveMode = () => {
         return;
     }
 
-    captchaPassiveMode = true;
-    if (captchaContainer) {
-        captchaContainer.hidden = true;
-        captchaContainer.classList.add('captcha-container--passive');
+    const activatePassive = () => {
+        captchaPassiveMode = true;
+        if (captchaContainer) {
+            captchaContainer.hidden = false;
+            captchaContainer.classList.add('captcha-container--passive');
+        }
+    };
+
+    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+        window.setTimeout(activatePassive, 500);
+    } else {
+        activatePassive();
     }
 };
 
