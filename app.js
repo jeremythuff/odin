@@ -214,6 +214,18 @@ const applyDebugMode = (value, options = {}) => {
     return setDebugMode(normalized);
 };
 
+const normalizeCandidates = (value) => {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (value && typeof value === 'object') {
+        return [value];
+    }
+
+    return [];
+};
+
 const loadCaptchaScript = () => {
     if (typeof window === 'undefined') {
         return Promise.reject(new Error('Captcha is unavailable in this environment.'));
@@ -805,7 +817,7 @@ const renderResult = (payload) => {
 
     const { query, result, rawResponse } = payload;
     const sections = [];
-    const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
+    const candidates = normalizeCandidates(result?.candidates);
     const catalogResultsUrl = buildCatalogResultsUrl(candidates);
     if (catalogResultsUrl) {
         lastCatalogResultsUrl = catalogResultsUrl;

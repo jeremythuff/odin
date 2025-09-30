@@ -225,60 +225,69 @@ const parseCandidates = (rawResponse) => {
     }
 };
 
-const buildPrompt = (description) => ({
-    system: [
-        "You are an expert bibliographic identifier.",
-        "Given a short passage or description, identify up to ${MAX_CANDIDATES} plausible source works.",
-        "Operate with a strict pipeline (silently):",
-        "  1) Extract HARD CUES from the description: exact quoted phrases (≥3 words), proper nouns (character/place/institution names), series names/volume numbers, genre/format markers, time/place indicators, and any explicit negatives (e.g., 'not YA', 'not Tolkien').",
-        "  2) Propose candidates that satisfy ALL hard cues. If any hard cue conflicts, discard the candidate.",
-        "  3) Prefer work-level identification (original/canonical work). Only return an edition if the description clearly specifies one.",
-        "  4) Verify identifiers only if you are certain they belong to that exact work/edition; otherwise omit them.",
-        "Scoring & abstention:",
-        "  • Confidence ∈ [0,1].",
-        "  • ≥0.90 only if you match an exact quote and ≥1 unique proper noun/series/setting cue.",
-        "  • 0.60–0.89 for strong multi-cue matches with no conflicts.",
-        "  • If the best candidate is < ${MIN_CONFIDENCE || 0.60}, return an empty array (abstain). Do NOT guess.",
-        "Evidence field:",
-        "  • Must cite at least one exact cue from the description (e.g., cues:[\"Brock Marsh\",\"The Bonetown\"]).",
-        "  • Add a short rationale referencing those cues (no chain-of-thought).",
-        "Metadata rules:",
-        "  • Use the earliest publication year of the work (omit if unknown).",
-        "  • Omit fields rather than using null/empty strings.",
-        "  • Sort by confidence desc; no duplicates.",
-        "If no plausible work exists, return an empty JSON array.",
-        "Output must be valid JSON only—no commentary."
-        ].join(' '),
-    user: [
-        `List up to ${MAX_CANDIDATES} candidate works that match the description below using the required JSON schema.`,
-        "Return only valid JSON (no text outside the JSON).",
-        "Abstain if the best candidate confidence is < ${MIN_CONFIDENCE || 0.60}.",
-        "Rules:",
-        "  • Candidates must satisfy ALL hard cues (exact phrases, proper nouns, series/volume markers, setting/time, explicit negatives).",
-        "  • Do not rely on general theme/genre similarity alone.",
-        "  • Use work-level earliest publication year; only pick a specific edition if the description specifies it.",
-        "  • Verify identifiers (ISBN-13, ISBN-10, OCLC, LCCN) strictly; omit any uncertain identifier.",
-        "  • Omit unknown fields entirely (no null/empty strings).",
-        "Schema (array of objects):",
-        "[",
-        "  {",
-        '    "title": "string",',
-        '    "authors": ["string", "..."],',
-        '    "year": number,',
-        '    "language": "string",',
-        '    "confidence": number,',
-        '    "evidence": "string",',
-        '    "identifiers": {',
-        '      "isbn13": "string",',
-        '      "isbn10": "string",',
-        '      "oclc": "string",',
-        '      "lccn": "string"',
-        "    }",
-        "  }",
-        "]",
-        "",
-        `Description: ${description}`
-        ].join(" "),
+const buildPrompt = (
+    description,
+    { MAX_CANDIDATES = 5, MAX_CONFIDENCE_GAP = 0.4,  } = {}
+    ) => ({
+    system: `
+        You are an expert bibliographic identifier. Given a short passage or description, identify up to ${MAX_CANDIDATES} plausible source works.
+
+        Operate with a strict pipeline (silently):
+        1) Extract **HARD CUES** from the description: exact quoted phrases (≥3 words), proper nouns (character/place/institution names), series names/volume numbers, genre/format markers, time/place indicators, and explicit negatives (e.g., not YA, not Tolkien).
+        2) Prefer candidates that satisfy ALL hard cues.
+        3) Prefer work-level identification (original/canonical work). Only return a specific edition if the description clearly specifies one.
+        4) Verify identifiers only if certain they belong to that exact work/edition; otherwise omit.
+
+        Scoring & abstention:
+        • Confidence ∈ [0,1].
+        • **SPECIFIC QUERY RULE:** If the description is an exact, unique title or well-known series name, the match must be scored at **1.00 (100%)**.
+        • ≥0.90 only if you match an exact quote AND ≥1 unique proper-noun/series/setting cue.
+        • 0.60–0.89 for strong multi-cue matches with no conflicts.
+        • **BROAD/GENRE RULE (e.g., "new weird scifi"):** If the description is a broad genre/topic, prioritize finding **${MAX_CANDIDATES} diverse, canonical examples** within that category. Scores may be lower, starting at $\approx 0.50$.
+
+        **ABSTENTION LOGIC (Modified):**
+        • Calculate the MIN_CONFIDENCE as: (Top Candidate's Confidence) - **${MAX_CONFIDENCE_GAP}**.
+        • **Retain all candidates** whose confidence is > MIN_CONFIDENCE.
+        • If no candidates can be found, return an empty array (abstain).
+
+        Evidence field:
+        • Must cite at least one exact cue from the description.
+        • Add a short rationale referencing those cues (no chain-of-thought).
+
+        Metadata rules:
+        • Use the earliest publication year of the work (omit if unknown).
+        • Omit fields rather than using null/empty strings.
+        • Sort by confidence desc; no duplicates.
+
+        Output:
+        • Return JSON only — no commentary. If no plausible work exists, return [].
+        `.trim(),
+
+    user: `
+        Return valid JSON using the following schema. Omit unknown fields entirely; verify identifiers strictly and omit any uncertain identifier.
+
+        Schema (array of objects):
+        [
+            {
+                'title': 'string',
+                'authors': ['string', ...],
+                'year': number,
+                'language': 'string',
+                'confidence': number,
+                'evidence': 'string',
+                'identifiers': {
+                'isbn13': 'string',
+                'isbn10': 'string',
+                'oclc': 'string',
+                'lccn': 'string'
+                'doi': 'string'
+                }
+            }
+        ]
+
+        Description:
+        ${description}
+        `.trim(),
 });
 
 
