@@ -13,21 +13,86 @@ const captchaContainer = document.getElementById('captcha-container');
 
 const clientConfig = (typeof window !== 'undefined' && window.__ODIN_CLIENT_CONFIG__ && typeof window.__ODIN_CLIENT_CONFIG__ === 'object') ? window.__ODIN_CLIENT_CONFIG__ : {};
 
-const resolveApiBaseUrl = () => {
-    const fallbackOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8000';
-    if (!clientConfig || typeof clientConfig !== 'object') {
-        return fallbackOrigin;
+const normalizeConfigValue = (value) => {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed || '';
     }
 
-    const candidate = clientConfig.apiBaseUrl;
-    if (typeof candidate === 'string') {
-        const trimmed = candidate.trim();
-        if (trimmed) {
-            return trimmed.replace(/\/+$/, '');
+    if (typeof value === 'number') {
+        return String(value);
+    }
+
+    return '';
+};
+
+const resolveProtocol = () => {
+    const protocol = normalizeConfigValue(clientConfig.apiProtocol);
+    if (protocol) {
+        return protocol.endsWith(':') ? protocol : `${protocol}:`;
+    }
+
+    if (typeof window !== 'undefined' && window.location?.protocol) {
+        return window.location.protocol;
+    }
+
+    return 'http:';
+};
+
+const resolveHost = () => {
+    const host = normalizeConfigValue(clientConfig.apiHost);
+    if (host) {
+        return host;
+    }
+
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+        return window.location.hostname;
+    }
+
+    return 'localhost';
+};
+
+const resolvePort = (protocol) => {
+    const configuredPort = normalizeConfigValue(clientConfig.apiPort);
+    if (configuredPort) {
+        return configuredPort;
+    }
+
+    if (typeof window !== 'undefined' && window.location?.port) {
+        return window.location.port;
+    }
+
+    if (protocol === 'https:') {
+        return '443';
+    }
+
+    if (protocol === 'http:') {
+        return '80';
+    }
+
+    return '';
+};
+
+const resolveApiBaseUrl = () => {
+    if (clientConfig && typeof clientConfig === 'object') {
+        const directBase = normalizeConfigValue(clientConfig.apiBaseUrl);
+        if (directBase) {
+            try {
+                return new URL(directBase).toString().replace(/\/+$/, '');
+            } catch (error) {
+                console.warn('Invalid apiBaseUrl provided. Falling back to derived URL.', error);
+            }
         }
     }
 
-    return fallbackOrigin;
+    const protocol = resolveProtocol();
+    const host = resolveHost();
+    const port = resolvePort(protocol);
+
+    const defaultPort = (protocol === 'https:' ? '443' : protocol === 'http:' ? '80' : '');
+    const portSegment = port && port !== defaultPort ? `:${port}` : '';
+
+    return `${protocol}//${host}${portSegment}`.replace(/\/+$/, '');
 };
 
 const API_BASE_URL = resolveApiBaseUrl();

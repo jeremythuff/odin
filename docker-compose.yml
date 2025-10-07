@@ -39,7 +39,10 @@ services:
       HOST: 0.0.0.0
       PORT: ${CLIENT_PORT:-3000}
       CLIENT_PORT: ${CLIENT_PORT:-3000}
-      API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8111}
+      API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+      API_PROTOCOL: ${PUBLIC_API_PROTOCOL:-}
+      API_HOST: ${PUBLIC_API_HOST:-}
+      API_PORT: ${PUBLIC_API_PORT:-8111}
     ports:
       - "8112:${CLIENT_PORT:-3000}"
     depends_on:
