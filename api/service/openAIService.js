@@ -8,7 +8,7 @@ const {
     resolveTemperature,
     parseCandidates,
     buildPrompt,
-} = require('../llmShared');
+} = require('./llmService');
 const { buildUsageStats } = require('./usageMetrics');
 
 const resolveOpenAiModel = () =>

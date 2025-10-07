@@ -1,7 +1,7 @@
 const { URL } = require('url');
 const searchService = require('../service/searchService');
 const { getCaptchaConfig, verifyCaptchaToken } = require('../service/captchaService');
-const { resolveProvider, normalizeProvider, PROVIDER_ALIASES } = require('../llmShared');
+const { resolveProvider, normalizeProvider, PROVIDER_ALIASES } = require('../service/llmService');
 const { resolveCatalogDomain, resolveDebugMode } = require('../utils/configUtils');
 const { sendJson } = require('../utils/headerUtils');
 const {

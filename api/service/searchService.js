@@ -1,4 +1,4 @@
-const { resolveProvider, normalizeProvider } = require('../llmShared');
+const { resolveProvider, normalizeProvider } = require('./llmService');
 const { convertDescriptionToIsbn: convertWithOpenAi } = require('./openAIService');
 const { convertDescriptionToIsbn: convertWithAnthropic } = require('./anthropicService');
 const { convertDescriptionToIsbn: convertWithGemini } = require('./geminiService');
