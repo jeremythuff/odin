@@ -86,7 +86,7 @@ main {
     height: 32px;
     border: none;
     border-radius: 50%;
-    background: rgba(51, 51, 51, 0.08);
+    background: rgba(255, 255, 255, 0.08);
     display: inline-flex;
     align-items: center;
     justify-content: center;
