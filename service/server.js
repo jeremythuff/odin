@@ -1,14 +1,11 @@
 require('dotenv').config();
 
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 const { URL } = require('url');
 const searchService = require('./searchService');
 const { getCaptchaConfig, verifyCaptchaToken } = require('./captchaService');
 const { resolveProvider, normalizeProvider, PROVIDER_ALIASES } = require('./llmShared');
 
-const STATIC_ROOT = __dirname;
 const DEFAULT_CATALOG_DOMAIN = 'https://catalog.library.tamu.edu';
 const catalogDomain = (() => {
     const envValue = process.env.CATALOG_DOMAIN;
@@ -160,15 +157,67 @@ const buildRateLimitHeaders = (status) => {
     return headers;
 };
 
-const MIME_TYPES = {
-    '.html': 'text/html',
-    '.js': 'text/javascript',
-    '.css': 'text/css',
+const corsOrigins = (() => {
+    const raw = process.env.CORS_ALLOWED_ORIGINS;
+    if (typeof raw !== 'string' || !raw.trim()) {
+        return new Set(['*']);
+    }
+
+    return new Set(raw.split(',').map((value) => value.trim()).filter(Boolean));
+})();
+
+const allowAllOrigins = corsOrigins.has('*');
+
+const resolveCorsOrigin = (requestOrigin) => {
+    if (allowAllOrigins) {
+        return '*';
+    }
+
+    if (typeof requestOrigin !== 'string') {
+        return null;
+    }
+
+    const normalized = requestOrigin.trim();
+    if (!normalized) {
+        return null;
+    }
+
+    return corsOrigins.has(normalized) ? normalized : null;
 };
 
-const sendJson = (res, statusCode, payload, extraHeaders = {}) => {
+const appendVaryHeader = (res, value) => {
+    const existing = res.getHeader('Vary');
+    if (!existing) {
+        res.setHeader('Vary', value);
+        return;
+    }
+
+    const values = new Set(String(existing).split(',').map((entry) => entry.trim()).filter(Boolean));
+    values.add(value);
+    res.setHeader('Vary', Array.from(values).join(', '));
+};
+
+const applyCorsHeaders = (req, res) => {
+    const origin = resolveCorsOrigin(req.headers?.origin);
+    if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        if (origin !== '*') {
+            appendVaryHeader(res, 'Origin');
+        }
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Max-Age', '600');
+};
+
+const sendJson = (req, res, statusCode, payload, extraHeaders = {}) => {
+    applyCorsHeaders(req, res);
     const headers = { 'Content-Type': 'application/json', ...extraHeaders };
-    res.writeHead(statusCode, headers);
+    Object.entries(headers).forEach(([key, value]) => {
+        res.setHeader(key, value);
+    });
+    res.statusCode = statusCode;
     res.end(JSON.stringify(payload));
 };
 
@@ -193,7 +242,7 @@ const handleSearchRequest = async (req, res) => {
     const rateLimitHeaders = buildRateLimitHeaders(rateLimitStatus);
 
     const respond = (statusCode, payload, extraHeaders = {}) => {
-        sendJson(res, statusCode, payload, { ...rateLimitHeaders, ...extraHeaders });
+        sendJson(req, res, statusCode, payload, { ...rateLimitHeaders, ...extraHeaders });
     };
 
     if (rateLimitStatus.limited) {
@@ -266,12 +315,12 @@ const handleApiRequest = async (req, res) => {
     const { pathname } = requestUrl;
 
     if (pathname === '/api/health' && req.method === 'GET') {
-        sendJson(res, 200, { ok: true, status: 'healthy' });
+        sendJson(req, res, 200, { ok: true, status: 'healthy' });
         return;
     }
 
     if (pathname === '/api/config' && req.method === 'GET') {
-        sendJson(res, 200, {
+        sendJson(req, res, 200, {
             ok: true,
             catalogDomain,
             debug: debugMode,
@@ -287,59 +336,35 @@ const handleApiRequest = async (req, res) => {
         return;
     }
 
-    sendJson(res, 404, { ok: false, error: 'API route not found.' });
-};
-
-const serveStaticFile = (req, res) => {
-    const requestPath = req.url.split('?')[0];
-    const relativePath = requestPath === '/' ? 'index.html' : requestPath.replace(/^\/+/, '');
-    const resolvedPath = path.normalize(path.join(STATIC_ROOT, relativePath));
-
-    if (!resolvedPath.startsWith(STATIC_ROOT)) {
-        res.writeHead(403, { 'Content-Type': 'text/plain' });
-        res.end('Forbidden');
-        return;
-    }
-
-    const extname = path.extname(resolvedPath).toLowerCase();
-    const contentType = MIME_TYPES[extname] || 'application/octet-stream';
-
-    fs.readFile(resolvedPath, (err, content) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                res.writeHead(404, { 'Content-Type': 'text/plain' });
-                res.end('Not found');
-                return;
-            }
-
-            res.writeHead(500, { 'Content-Type': 'text/plain' });
-            res.end('Internal server error');
-            return;
-        }
-
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(content, 'utf-8');
-    });
+    sendJson(req, res, 404, { ok: false, error: 'API route not found.' });
 };
 
 const server = http.createServer(async (req, res) => {
     console.log(`Received request: ${req.method} ${req.url}`);
+
+    if (req.method === 'OPTIONS' && req.url.startsWith('/api/')) {
+        applyCorsHeaders(req, res);
+        res.setHeader('Content-Length', '0');
+        res.writeHead(204);
+        res.end();
+        return;
+    }
 
     if (req.url.startsWith('/api/')) {
         try {
             await handleApiRequest(req, res);
         } catch (error) {
             console.error('Unhandled API error:', error);
-            sendJson(res, 500, { ok: false, error: 'Internal server error.' });
+            sendJson(req, res, 500, { ok: false, error: 'Internal server error.' });
         }
         return;
     }
 
-    serveStaticFile(req, res);
+    sendJson(req, res, 404, { ok: false, error: 'Not found.' });
 });
 
 const port = process.env.PORT || 8000;
 const host = process.env.HOST || '0.0.0.0';
 server.listen(port, host, () => {
-    console.log(`Serving / at http://${host}:${port}`);
+    console.log(`API listening at http://${host}:${port}`);
 });

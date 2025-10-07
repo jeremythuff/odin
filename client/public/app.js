@@ -11,6 +11,37 @@ const configDebugInput = document.getElementById('config-debug');
 const configResetButton = document.getElementById('config-reset');
 const captchaContainer = document.getElementById('captcha-container');
 
+const clientConfig = (typeof window !== 'undefined' && window.__ODIN_CLIENT_CONFIG__ && typeof window.__ODIN_CLIENT_CONFIG__ === 'object') ? window.__ODIN_CLIENT_CONFIG__ : {};
+
+const resolveApiBaseUrl = () => {
+    const fallbackOrigin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8000';
+    if (!clientConfig || typeof clientConfig !== 'object') {
+        return fallbackOrigin;
+    }
+
+    const candidate = clientConfig.apiBaseUrl;
+    if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed) {
+            return trimmed.replace(/\/+$/, '');
+        }
+    }
+
+    return fallbackOrigin;
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+const buildApiUrl = (pathname = '') => {
+    const normalized = typeof pathname === 'string' ? pathname : '';
+    try {
+        return new URL(normalized, `${API_BASE_URL}/`).toString();
+    } catch (error) {
+        const suffix = normalized.startsWith('/') ? normalized : `/${normalized}`;
+        return `${API_BASE_URL}${suffix}`;
+    }
+};
+
 const escapeHtml = (value = '') => value.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char));
 
 const showResultsContainer = () => {
@@ -1143,7 +1174,7 @@ const performSearch = async () => {
     }
 
     try {
-        const response = await fetch('/api/search', {
+        const response = await fetch(buildApiUrl('/api/search'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1204,7 +1235,7 @@ const initializeConfig = async () => {
     let fetchedDebugMode = debugMode;
 
     try {
-        const response = await fetch('/api/config');
+        const response = await fetch(buildApiUrl('/api/config'));
         if (response.ok) {
             const payload = await response.json();
             if (payload?.ok) {

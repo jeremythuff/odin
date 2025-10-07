@@ -1,13 +1,10 @@
 {
-    "name": "odin-web-interface",
+    "name": "odin-service",
     "version": "1.0.0",
     "description": "Open Discovery Interface",
     "main": "server.js",
     "scripts": {
         "start": "node server.js"
-    },
-    "devDependencies": {
-        "live-server": "^1.2.2"
     },
     "dependencies": {
         "dotenv": "^17.2.2"
