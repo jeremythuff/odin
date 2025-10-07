@@ -8,7 +8,7 @@ const {
     resolveTemperature,
     parseCandidates,
     buildPrompt,
-} = require('./llmShared');
+} = require('../llmShared');
 const { buildUsageStats } = require('./usageMetrics');
 
 const resolveGeminiModel = () =>

@@ -1,8 +1,8 @@
 {
-  "name": "odin-client",
+  "name": "odin-ui",
   "version": "1.0.0",
   "private": true,
-  "description": "Static client for the ODIN interface",
+  "description": "Static UI for the ODIN interface",
   "main": "server.js",
   "scripts": {
     "start": "node scripts/build-config.js && node server.js"

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICE_DIR="$ROOT_DIR/service"
-CLIENT_DIR="$ROOT_DIR/client"
+API_DIR="$ROOT_DIR/api"
+UI_DIR="$ROOT_DIR/ui"
 
 extract_env_value() {
   local file="$1"
@@ -22,9 +22,9 @@ extract_env_value() {
   return 0
 }
 
-resolve_service_port() {
+resolve_api_port() {
   local value
-  value=$(extract_env_value "$SERVICE_DIR/.env" "PORT") || true
+  value=$(extract_env_value "$API_DIR/.env" "PORT") || true
   if [ -n "$value" ]; then
     echo "$value"
     return
@@ -33,15 +33,15 @@ resolve_service_port() {
   echo "8000"
 }
 
-resolve_client_port() {
+resolve_ui_port() {
   local value
-  value=$(extract_env_value "$CLIENT_DIR/.env" "CLIENT_PORT") || true
+  value=$(extract_env_value "$UI_DIR/.env" "CLIENT_PORT") || true
   if [ -n "$value" ]; then
     echo "$value"
     return
   fi
 
-  value=$(extract_env_value "$CLIENT_DIR/.env" "PORT") || true
+  value=$(extract_env_value "$UI_DIR/.env" "PORT") || true
   if [ -n "$value" ]; then
     echo "$value"
     return
@@ -86,11 +86,11 @@ kill_listeners() {
   echo "$label stopped."
 }
 
-service_port=$(resolve_service_port)
-client_port=$(resolve_client_port)
+api_port=$(resolve_api_port)
+ui_port=$(resolve_ui_port)
 
 result=0
-kill_listeners "$service_port" "Service" || result=$?
-kill_listeners "$client_port" "Client" || result=$?
+kill_listeners "$api_port" "API" || result=$?
+kill_listeners "$ui_port" "UI" || result=$?
 
 exit "$result"

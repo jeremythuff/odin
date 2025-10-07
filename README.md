@@ -5,7 +5,7 @@ ODIn is an AI Empowered Bibliographic Discovery Interface.
 
 ## LLM configuration
 
-Use the following environment variables to enable the different language model providers when starting the server:
+Use the following environment variables to enable the different language model providers when starting the API service:
 
 ### OpenAI
 
@@ -29,7 +29,7 @@ Use the following environment variables to enable the different language model p
 
 Set `LLM_PROVIDER` to choose which backend processes requests. Supported values include `openai`, `claude`, and `gemini` (plus common aliases such as `gpt`, `anthropic`, or `google`). If omitted or unrecognised, OpenAI is used by default.
 
-These values are read by the backend service when processing search requests that convert descriptions or excerpts into ISBNs.
+These values are read by the backend API when processing search requests that convert descriptions or excerpts into ISBNs.
 
 ## Security controls
 
@@ -47,7 +47,7 @@ These headers are surfaced to clients (`X-RateLimit-Limit`, `X-RateLimit-Remaini
 To require human verification before running searches, provide hCaptcha credentials:
 
 - `HCAPTCHA_SITE_KEY`: Public site key used by the browser widget.
-- `HCAPTCHA_SECRET_KEY`: Private secret used by the server to validate responses.
+- `HCAPTCHA_SECRET_KEY`: Private secret used by the API to validate responses.
 - `CAPTCHA_PROVIDER` (optional): Set to `hcaptcha` (default) to enable the integration.
 
-When both keys are present, the frontend automatically renders the hCaptcha challenge and the backend validates the token before executing a search.
+When both keys are present, the UI automatically renders the hCaptcha challenge and the API validates the token before executing a search.

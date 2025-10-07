@@ -5,10 +5,10 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-COPY client/package.json ./package.json
+COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY client/. ./
+COPY . ./
 
 EXPOSE 3000
 

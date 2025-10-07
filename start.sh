@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICE_DIR="$ROOT_DIR/service"
-CLIENT_DIR="$ROOT_DIR/client"
+API_DIR="$ROOT_DIR/api"
+UI_DIR="$ROOT_DIR/ui"
 
 ensure_installed() {
   local dir="$1"
@@ -29,9 +29,9 @@ extract_env_value() {
   return 0
 }
 
-resolve_service_port() {
+resolve_api_port() {
   local value
-  value=$(extract_env_value "$SERVICE_DIR/.env" "PORT") || true
+  value=$(extract_env_value "$API_DIR/.env" "PORT") || true
   if [ -n "$value" ]; then
     echo "$value"
     return
@@ -40,15 +40,15 @@ resolve_service_port() {
   echo "8000"
 }
 
-resolve_client_port() {
+resolve_ui_port() {
   local value
-  value=$(extract_env_value "$CLIENT_DIR/.env" "CLIENT_PORT") || true
+  value=$(extract_env_value "$UI_DIR/.env" "CLIENT_PORT") || true
   if [ -n "$value" ]; then
     echo "$value"
     return
   fi
 
-  value=$(extract_env_value "$CLIENT_DIR/.env" "PORT") || true
+  value=$(extract_env_value "$UI_DIR/.env" "PORT") || true
   if [ -n "$value" ]; then
     echo "$value"
     return
@@ -73,38 +73,60 @@ check_port_available() {
   fi
 }
 
-start_service() {
-  (cd "$SERVICE_DIR" && npm start)
+start_api() {
+  (cd "$API_DIR" && npm start)
 }
 
-start_client() {
-  (cd "$CLIENT_DIR" && npm start)
+start_ui() {
+  (cd "$UI_DIR" && npm start)
 }
 
-ensure_installed "$SERVICE_DIR"
-ensure_installed "$CLIENT_DIR"
+ensure_installed "$API_DIR"
+ensure_installed "$UI_DIR"
 
-service_port=$(resolve_service_port)
-client_port=$(resolve_client_port)
+api_port=$(resolve_api_port)
+ui_port=$(resolve_ui_port)
 
-check_port_available "$service_port"
-check_port_available "$client_port"
+check_port_available "$api_port"
+check_port_available "$ui_port"
 
-start_service &
-service_pid=$!
+start_api &
+api_pid=$!
 
-start_client &
-client_pid=$!
+start_ui &
+ui_pid=$!
 
 cleanup() {
   trap - INT TERM
-  kill "$service_pid" "$client_pid" 2>/dev/null || true
-  wait "$service_pid" "$client_pid" 2>/dev/null || true
+  kill "$api_pid" "$ui_pid" 2>/dev/null || true
+  wait "$api_pid" "$ui_pid" 2>/dev/null || true
+  "$ROOT_DIR/stop.sh" >/dev/null 2>&1 || true
 }
 
 trap cleanup INT TERM
 
-wait -n "$service_pid" "$client_pid"
-exit_code=$?
+exit_code=0
+while true; do
+  if ! kill -0 "$api_pid" 2>/dev/null; then
+    if wait "$api_pid" >/dev/null 2>&1; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
+    break
+  fi
+
+  if ! kill -0 "$ui_pid" 2>/dev/null; then
+    if wait "$ui_pid" >/dev/null 2>&1; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
+    break
+  fi
+
+  sleep 1
+done
+
 cleanup
 exit "$exit_code"

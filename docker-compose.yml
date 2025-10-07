@@ -1,9 +1,9 @@
 services:
-  odin-service:
+  odin-api:
     build:
-      context: ./service
+      context: ./api
       dockerfile: Dockerfile
-    image: odin-service:latest
+    image: odin-api:latest
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -29,11 +29,11 @@ services:
       retries: 5
       start_period: 30s
 
-  odin-client:
+  odin-ui:
     build:
-      context: .
-      dockerfile: client/Dockerfile
-    image: odin-client:latest
+      context: ./ui
+      dockerfile: Dockerfile
+    image: odin-ui:latest
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -46,7 +46,7 @@ services:
     ports:
       - "8112:${CLIENT_PORT:-3000}"
     depends_on:
-      - odin-service
+      - odin-api
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$${CLIENT_PORT:-3000}/healthz | grep -q 'ok' || exit 1"]
