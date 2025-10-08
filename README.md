@@ -3,51 +3,89 @@ Open Discovery Interface
 
 ODIn is an AI Empowered Bibliographic Discovery Interface.
 
-## LLM configuration
+## Architecture
 
-Use the following environment variables to enable the different language model providers when starting the API service:
+The project is split into two services:
 
-### OpenAI
+- **api/** – Node.js API responsible for catalog lookups, rate limiting, captcha verification, and LLM-driven enrichment.
+- **ui/** – Static site + lightweight server that serves the UI bundle and proxies configuration to the browser.
 
-- `OPENAI_API_KEY`: A valid OpenAI API key.
-- `OPENAI_MODEL` (optional): The chat completion model to use. Defaults to `gpt-4.1-mini` if not provided.
+Use the helper scripts in the repo root (`start.sh`, `stop.sh`) to install dependencies and run/stop both services together.
 
-### Anthropic Claude
+## Environment variables
 
-- `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY`): A valid Anthropic API key.
-- `CLAUDE_MODEL` (optional): Claude model identifier. Defaults to `claude-3-haiku-20240307`.
-- `CLAUDE_MAX_TOKENS` (optional): Maximum completion tokens to request (up to 4000).
+### API service (`api/`)
 
-### Google Gemini
+- **Runtime**
+  - `PORT` (default `8000`): Port the API binds to.
+  - `HOST` (default `0.0.0.0`): Host/interface the API listens on.
+  - `CORS_ALLOWED_ORIGINS` (default `*`): Comma-separated list of allowed origins for CORS responses.
+  - `CATALOG_DOMAIN` (default `https://catalog.library.tamu.edu`): Base catalog domain included in config responses.
+  - `DEBUG` (default `false`): Enables additional debugging flags in the returned config payload.
 
-- `GEMINI_API_KEY` (or `GOOGLE_API_KEY`): A valid Gemini API key.
-- `GEMINI_MODEL` (optional): Gemini model identifier. Defaults to `gemini-pro`.
-- `GEMINI_API_VERSION` (optional): API version segment, defaults to `v1`.
-- `GEMINI_API_HOSTNAME` (optional): Override the Gemini host if needed, defaults to `generativelanguage.googleapis.com`.
+- **Rate limiting**
+  - `RATE_LIMIT_MAX_REQUESTS` (default `30`): Maximum requests permitted per client inside the rolling window. Set to `0` or negative to disable rate limiting.
+  - `RATE_LIMIT_WINDOW_MS` (default `60000`): Rolling window size in milliseconds.
 
-### Selecting the provider
+- **Captcha**
+  - `CAPTCHA_PROVIDER` (default `hcaptcha`): Captcha provider identifier.
+  - `HCAPTCHA_SITE_KEY` / `CAPTCHA_SITE_KEY`: Public site key shared with the UI.
+  - `HCAPTCHA_SECRET_KEY` / `CAPTCHA_SECRET_KEY`: Secret used by the API to validate captcha tokens.
 
-Set `LLM_PROVIDER` to choose which backend processes requests. Supported values include `openai`, `claude`, and `gemini` (plus common aliases such as `gpt`, `anthropic`, or `google`). If omitted or unrecognised, OpenAI is used by default.
+- **LLM selection & behaviour**
+  - `LLM_PROVIDER` (default `openai`): Provider alias (`openai`, `claude`, `gemini`, plus common synonyms).
+  - `LLM_TEMPERATURE` / `MODEL_TEMPERATURE` (default `0.2`): Sampling temperature applied where supported.
+  - `LLM_PRICING_OVERRIDES`: JSON object mapping provider/model pairs to pricing overrides used in usage reporting.
 
-These values are read by the backend API when processing search requests that convert descriptions or excerpts into ISBNs.
+- **OpenAI settings**
+  - `OPENAI_API_KEY` (required for OpenAI usage): API key.
+  - `OPENAI_MODEL`: Preferred chat completion model.
+  - `DEFAULT_OPENAI_MODEL` (default `gpt-4.1-mini`): Fallback model if `OPENAI_MODEL` is unset.
 
-## Security controls
+- **Anthropic Claude settings**
+  - `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` (one required for Claude usage): API key.
+  - `CLAUDE_MODEL` (default `claude-3-haiku-20240307`): Model identifier.
+  - `CLAUDE_MAX_TOKENS` (default `1024`, max `4000`): Maximum completion tokens requested.
+  - `ANTHROPIC_VERSION` (default `2023-06-01`): Claude API version header.
 
-### Rate limiting
+- **Google Gemini settings**
+  - `GEMINI_API_KEY` / `GOOGLE_API_KEY` (one required for Gemini usage): API key.
+  - `GEMINI_MODEL`: Preferred model.
+  - `DEFAULT_GEMINI_MODEL` (default `gemini-pro`): Fallback model.
+  - `GEMINI_API_VERSION` (default `v1`): API version segment.
+  - `GEMINI_API_HOSTNAME` (default `generativelanguage.googleapis.com`): Hostname for Gemini requests.
 
-The API endpoints apply an in-memory rate limiter. Adjust the behaviour with the following environment variables:
+### UI service (`ui/`)
 
-- `RATE_LIMIT_MAX_REQUESTS`: Maximum number of requests a client may make during the window. Set to `0` or a negative value to disable. Defaults to `30`.
-- `RATE_LIMIT_WINDOW_MS`: Size of the rolling window in milliseconds. Defaults to `60000` (one minute).
+- `CLIENT_PORT` (default `3000`): Preferred port for the UI server (takes precedence over `PORT`).
+- `PORT` (fallback `3000`): Fallback UI server port when `CLIENT_PORT` is unset.
+- `HOST` (default `0.0.0.0`): Host/interface the UI binds to.
+- `API_BASE_URL`: Fully-qualified base URL for API requests (overrides protocol/host/port).
+- `API_PROTOCOL`: `http` or `https` portion used when constructing API URLs.
+- `API_HOST`: Hostname used for the API when `API_BASE_URL` is not set.
+- `API_PORT`: Port used for the API when `API_BASE_URL` is not set.
 
-These headers are surfaced to clients (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) along with `Retry-After` when throttled.
+All UI environment variables are read when running the local UI server; `API_*` values are embedded into `public/client-config.js` for the browser.
 
-### Captcha verification
+## Running with Docker
 
-To require human verification before running searches, provide hCaptcha credentials:
+The repository ships with a multi-service compose file that builds and runs both the API and UI.
 
-- `HCAPTCHA_SITE_KEY`: Public site key used by the browser widget.
-- `HCAPTCHA_SECRET_KEY`: Private secret used by the API to validate responses.
-- `CAPTCHA_PROVIDER` (optional): Set to `hcaptcha` (default) to enable the integration.
+```bash
+docker compose up --build
+```
 
-When both keys are present, the UI automatically renders the hCaptcha challenge and the API validates the token before executing a search.
+- `odin-api` exposes the API on port `8111` by default (configurable via `PORT` in your environment).
+- `odin-ui` exposes the UI on port `8112` by default (configurable via `CLIENT_PORT`).
+
+To override environment variables for either container, create a `.env` file in the repository root or pass values inline, e.g.:
+
+```bash
+PORT=9000 CLIENT_PORT=4000 docker compose up --build
+```
+
+When you are done, stop the stack with:
+
+```bash
+docker compose down
+```
