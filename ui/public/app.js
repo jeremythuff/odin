@@ -125,6 +125,27 @@ const hideResultsContainer = () => {
     resultsContainer.classList.add('results-container--hidden');
 };
 
+const setSearchControlsDisabled = (disabled) => {
+    if (searchBox) {
+        searchBox.disabled = disabled;
+        searchBox.setAttribute('aria-disabled', String(disabled));
+    }
+
+    if (searchSubmitButton) {
+        searchSubmitButton.disabled = disabled;
+        searchSubmitButton.setAttribute('aria-disabled', String(disabled));
+    }
+
+    if (configButton) {
+        configButton.disabled = disabled;
+        configButton.setAttribute('aria-disabled', String(disabled));
+    }
+
+    if (disabled) {
+        closeConfigMenu();
+    }
+};
+
 const DEFAULT_CATALOG_DOMAIN = 'https://catalog.library.tamu.edu';
 let catalogDomain = DEFAULT_CATALOG_DOMAIN;
 let serverCatalogDomain = DEFAULT_CATALOG_DOMAIN;
@@ -1256,6 +1277,14 @@ function toggleConfigMenu() {
 }
 
 const performSearch = async () => {
+    if (!searchBox) {
+        return;
+    }
+
+    if (searchSubmitButton && searchSubmitButton.disabled) {
+        return;
+    }
+
     const query = searchBox.value.trim();
     lastRenderedPayload = null;
     lastCatalogResultsUrl = null;
@@ -1300,8 +1329,7 @@ const performSearch = async () => {
         }
     }
 
-    searchBox.value = '';
-
+    setSearchControlsDisabled(true);
     showResultsContainer();
     resultsContainer.innerHTML = `
         <div class="result-loading" role="status" aria-live="polite">
@@ -1366,6 +1394,11 @@ const performSearch = async () => {
         lastRenderedPayload = null;
         lastCatalogResultsUrl = null;
     } finally {
+        setSearchControlsDisabled(false);
+        if (searchBox) {
+            searchBox.value = '';
+            searchBox.focus();
+        }
         if (captchaConfigState.enabled) {
             resetCaptcha();
         }
