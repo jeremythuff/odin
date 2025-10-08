@@ -1,4 +1,5 @@
 const { classifyQueryEmbedding, ROUTES } = require('./embeddingClassifier');
+const { classifyWithDisambiguationLLM } = require('./disambiguationService');
 
 const EXECUTION_TARGETS = {
     DIRECT: 'OPAC_LOOKUP',
@@ -98,17 +99,41 @@ const runEmbeddingClassificationPhase = (rawQuery, normalizedQuery) => {
 
 const shouldRunDisambiguation = (embeddingResult) => embeddingResult.similarityMargin < 0.08;
 
-const runLLMDisambiguationPhase = (embeddingResult) => ({
-    phase: 'LLM Disambiguation Phase',
-    invoked: true,
-    label: embeddingResult.label,
-    confidence: Math.max(embeddingResult.confidence, 0.8),
-    reason: 'Stub LLM response. Replace with structured JSON classification.',
-});
+const runLLMDisambiguationPhase = async ({ normalizedQuery, embedding }) => {
+    try {
+        const llmResult = await classifyWithDisambiguationLLM({
+            normalizedQuery,
+            embedding,
+            initialLabel: embedding.label,
+        });
 
-const skipLLMDisambiguationPhase = () => ({
+        return {
+            phase: 'LLM Disambiguation Phase',
+            invoked: true,
+            provider: llmResult.provider,
+            model: llmResult.model,
+            label: llmResult.label,
+            confidence: llmResult.confidence,
+            reason: llmResult.reason,
+            rawResponse: llmResult.rawResponse,
+        };
+    } catch (error) {
+        return {
+            phase: 'LLM Disambiguation Phase',
+            invoked: false,
+            error: error.message,
+            label: embedding.label,
+            confidence: embedding.confidence,
+            reason: 'Failed to invoke disambiguation LLM. Retaining embedding classification.',
+        };
+    }
+};
+
+const skipLLMDisambiguationPhase = (embeddingResult) => ({
     phase: 'LLM Disambiguation Phase',
     invoked: false,
+    label: embeddingResult.label,
+    confidence: embeddingResult.confidence,
     reason: 'Similarity margin exceeded threshold; skipping LLM disambiguation.',
 });
 
@@ -159,11 +184,14 @@ const runSearchPipeline = async (rawQuery, options = {}) => {
 
     let llmPhase;
     if (!heuristic.decision.route && shouldRunDisambiguation(embedding)) {
-        llmPhase = runLLMDisambiguationPhase(embedding);
-        classification = llmPhase.label;
-        confidence = llmPhase.confidence;
+        llmPhase = await runLLMDisambiguationPhase({
+            normalizedQuery: normalization.normalizedQuery,
+            embedding,
+        });
+        classification = llmPhase.label || classification;
+        confidence = llmPhase.confidence ?? confidence;
     } else {
-        llmPhase = skipLLMDisambiguationPhase();
+        llmPhase = skipLLMDisambiguationPhase(embedding);
     }
     phases.push(llmPhase);
 

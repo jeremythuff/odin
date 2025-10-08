@@ -75,13 +75,13 @@ const requestOpenAiCompletion = (prompt) => {
     });
 };
 
-const convertDescriptionToIsbn = async (description) => {
+const convertDescriptionToIsbn = async (description, { classification } = {}) => {
     const trimmedDescription = (description || '').trim();
     if (!trimmedDescription) {
         throw new Error('A description or excerpt is required to perform the conversion.');
     }
 
-    const prompt = buildPrompt(trimmedDescription);
+    const prompt = buildPrompt(trimmedDescription, { classification });
     const { rawText: rawResponse, model, usage: rawUsage } = await requestOpenAiCompletion(prompt);
 
     const candidates = parseCandidates(rawResponse);

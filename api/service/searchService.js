@@ -51,7 +51,7 @@ const performSearch = async (query, options = {}) => {
     const handler = providerHandlers[provider] || providerHandlers.openai;
 
     try {
-        const aiResult = await handler(normalizedQuery);
+        const aiResult = await handler(normalizedQuery, { classification: pipeline.classification });
         return buildBaseResponse(pipeline, {
             ok: true,
             query: pipeline.rawQuery,

@@ -36,6 +36,9 @@ Use the helper scripts in the repo root (`start.sh`, `stop.sh`) to install depen
   - `LLM_PROVIDER` (default `openai`): Provider alias (`openai`, `claude`, `gemini`, plus common synonyms).
   - `LLM_TEMPERATURE` / `MODEL_TEMPERATURE` (default `0.2`): Sampling temperature applied where supported.
   - `LLM_PRICING_OVERRIDES`: JSON object mapping provider/model pairs to pricing overrides used in usage reporting.
+  - `DISAMBIGUATION_PROVIDER` (default `openai`): Provider used for the LLM disambiguation phase.
+  - `DISAMBIGUATION_OPENAI_MODEL` (default `gpt-4o-mini`): OpenAI model dedicated to the disambiguation classifier.
+  - `DISAMBIGUATION_OPENAI_API_KEY` (optional): Alternate API key for the disambiguation model. Falls back to `OPENAI_API_KEY` when omitted.
 
 - **OpenAI settings**
   - `OPENAI_API_KEY` (required for OpenAI usage): API key.
