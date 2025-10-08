@@ -899,6 +899,13 @@ const formatCandidateHtml = (candidate, index) => {
     `;
 };
 
+const CLASSIFICATION_LABELS = {
+    DIRECT: 'Direct (deterministic routing)',
+    REFERENCE: 'Reference (entity resolution)',
+    EXPLORATORY: 'Exploratory (semantic search)',
+    COMPARATIVE: 'Comparative (similarity)',
+};
+
 const renderResult = (payload) => {
     lastCatalogResultsUrl = null;
 
@@ -911,12 +918,27 @@ const renderResult = (payload) => {
         return `<p class="error">${message}</p>`;
     }
 
-    const { query, result, rawResponse } = payload;
+    const { query, result, rawResponse, pipeline, classification, confidence } = payload;
     const sections = [];
-    const candidates = normalizeCandidates(result?.candidates);
-    const catalogResultsUrl = buildCatalogResultsUrl(candidates);
-    if (catalogResultsUrl) {
+    const resolvedClassification = classification || pipeline?.classification || null;
+    const isDirectRoute =
+        (result?.route === 'DIRECT' || resolvedClassification === 'DIRECT') &&
+        typeof result?.url === 'string' &&
+        result.url.trim();
+
+    let catalogResultsUrl = null;
+    let candidates = [];
+
+    if (isDirectRoute) {
+        catalogResultsUrl = result.url.trim();
         lastCatalogResultsUrl = catalogResultsUrl;
+    } else {
+        candidates = normalizeCandidates(result?.candidates);
+        const candidateUrl = buildCatalogResultsUrl(candidates);
+        if (candidateUrl) {
+            catalogResultsUrl = candidateUrl;
+            lastCatalogResultsUrl = candidateUrl;
+        }
     }
 
     const summaryItems = [];
@@ -928,6 +950,37 @@ const renderResult = (payload) => {
                     <button type="button" class="result-summary__refine">Refine</button>
                 </div>
                 <span class="result-summary__value">${escapeHtml(query)}</span>
+            </div>
+        `);
+    }
+
+    if (isDirectRoute) {
+        summaryItems.push(`
+            <div class="result-summary__item">
+                <span class="result-summary__label">Routing</span>
+                <span class="result-summary__value">DIRECT → OPAC Lookup</span>
+            </div>
+        `);
+
+        if (result?.identifier) {
+            const label = result.identifierType ? result.identifierType.toUpperCase() : 'Identifier';
+            summaryItems.push(`
+                <div class="result-summary__item">
+                    <span class="result-summary__label">${escapeHtml(label)}</span>
+                    <span class="result-summary__value">${escapeHtml(result.identifier)}</span>
+                </div>
+            `);
+        }
+    }
+
+    if (resolvedClassification) {
+        const label = CLASSIFICATION_LABELS[resolvedClassification] || resolvedClassification;
+        const hasConfidence = typeof confidence === 'number' && !Number.isNaN(confidence);
+        const confidenceLabel = hasConfidence ? ` (confidence ${(confidence * 100).toFixed(0)}%)` : '';
+        summaryItems.push(`
+            <div class="result-summary__item">
+                <span class="result-summary__label">Classification</span>
+                <span class="result-summary__value">${escapeHtml(label)}${hasConfidence ? escapeHtml(confidenceLabel) : ''}</span>
             </div>
         `);
     }
@@ -981,11 +1034,38 @@ const renderResult = (payload) => {
             .map((candidate, index) => formatCandidateHtml(candidate, index))
             .join('');
         sections.push(`<ol class="candidate-list">${items}</ol>`);
+    } else if (isDirectRoute && catalogResultsUrl) {
+        sections.push(`
+            <p class="result-direct">
+                This query matched a deterministic identifier. Redirecting you to the catalog…
+                <br>
+                <a href="${escapeHtml(catalogResultsUrl)}">Continue to catalog results</a>
+            </p>
+        `);
     } else if (rawResponse) {
         sections.push(`
             <details class="result-raw">
                 <summary>View raw AI response</summary>
                 <pre class="result-raw__content">${escapeHtml(rawResponse)}</pre>
+            </details>
+        `);
+    }
+
+    if (debugMode && pipeline && Array.isArray(pipeline.phases)) {
+        const rows = pipeline.phases
+            .map((phase) => {
+                const name = escapeHtml(String(phase.phase || 'Unknown Phase'));
+                const details = escapeHtml(JSON.stringify(phase, null, 2));
+                return `<tr><td>${name}</td><td><pre>${details}</pre></td></tr>`;
+            })
+            .join('');
+        sections.push(`
+            <details class="result-pipeline">
+                <summary>View pipeline phases (${pipeline.phases.length})</summary>
+                <table class="result-pipeline__table">
+                    <thead><tr><th>Phase</th><th>Details</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
             </details>
         `);
     }
